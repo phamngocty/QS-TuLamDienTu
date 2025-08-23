@@ -1,0 +1,47 @@
+# Cursor Rules – ESP32-C3 Quickshifter
+
+## Mục tiêu
+Thêm OTA cho:
+1) Firmware (nạp `firmware.bin`)
+2) Web UI:
+   - Cách A: nạp FS image `littlefs.bin` (thay toàn bộ `/data`).
+   - Cách B: upload 1 file (ví dụ `/index.html`) lên LittleFS.
+
+## Ràng buộc kỹ thuật
+- Board: ESP32-C3 (PlatformIO, Arduino)
+- Web server: ESPAsyncWebServer
+- FS: LittleFS (phân vùng data). Khi Update FS image dùng `Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)` (đây là cờ đúng cho phân vùng data dù dùng LittleFS).
+- OTA firmware: `Update.begin(UPDATE_SIZE_UNKNOWN)` và `Update.end(true)`.
+- Đảm bảo giữ logic sẵn có: `lastHit`, `holdPortal`, `SLOG`, không xóa route cũ.
+- Sau khi OTA thành công: trả JSON `{ok:true}`, đóng client và `delay(1200); ESP.restart();`.
+
+## Endpoint phải có
+- GET `/ota` : trang OTA tối giản (dự phòng)
+- POST `/api/ota/firmware` : nhận file `update` (firmware .bin)
+- POST `/api/ota/fsimage`  : nhận file `update` (LittleFS image .bin)
+- POST `/api/upload?path=/index.html` : upload 1 file vào LittleFS (trả `{ok:true}`), không reboot
+
+## UI
+Trong `data/index.html` (tab Tools & Logs) thêm form:
+- Upload Firmware
+- Upload FS Image
+- Upload 1 file `/index.html`
+Và gọi `/api/wifi_hold?on=1` khi submit để giữ AP (không tắt Wi-Fi khi OTA).
+
+## PlatformIO
+- `board_build.filesystem = littlefs`
+- `board_build.partitions = default_ota.csv` (2 OTA app + data)
+- Build targets: `Build`, `Build Filesystem Image`.
+
+## Phong cách
+- Không thay đổi tên hàm/biến công khai nếu không cần.
+- Nhật ký: dùng `SLOGf/SLOGln` như code gốc.
+- Không chạm vào logic Quickshifter/Lock ngoài phạm vi OTA.
+
+## Kiểm thử (acceptance)
+- Biên dịch OK.
+- Gọi `/ota` trả trang HTML tối giản.
+- Upload firmware → `{ok:true, msg:...}` → reboot.
+- Upload FS image → `{ok:true, msg:...}` → reboot.
+- Upload 1 file `/index.html` → `{ok:true}` → no reboot → refresh thấy thay đổi.
+
