@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Quickshifter</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { border: 1px solid #ccc; padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .btn { padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        input, select { padding: 8px; margin: 5px; border: 1px solid #ccc; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Test Quickshifter ESP32-C3</h1>
+    
+    <!-- Test RPM -->
+    <div class="test-section">
+        <h3>📊 Test RPM</h3>
+        <div>
+            <label>Enable: <input type="checkbox" id="tr_en" checked></label>
+            <label>RPM: <input type="number" id="tr_rpm" value="5000" min="1000" max="14000"></label>
+            <label>PPR: <input type="number" id="tr_ppr" value="1" step="0.5" min="0.5" max="2"></label>
+            <button class="btn btn-primary" onclick="testRPM()">Test RPM</button>
+        </div>
+        <div id="rpmStatus" class="status info">Click Test RPM để bắt đầu</div>
+    </div>
+
+    <!-- Test Cut Outputs -->
+    <div class="test-section">
+        <h3>⚡ Test Cut Outputs</h3>
+        <div>
+            <button class="btn btn-danger" onclick="testCut('ign')">Test IGN Cut</button>
+            <button class="btn btn-danger" onclick="testCut('inj')">Test INJ Cut</button>
+        </div>
+        <div id="cutStatus" class="status info">Click Test Cut để kiểm tra relay</div>
+    </div>
+
+    <!-- Test Trigger Input -->
+    <div class="test-section">
+        <h3>🔌 Test Trigger Input (NPN)</h3>
+        <div>
+            <button class="btn btn-success" onclick="checkTrigger()">Check NPN Status</button>
+            <button class="btn btn-primary" onclick="startTriggerMonitor()">Start Monitor</button>
+            <button class="btn btn-danger" onclick="stopTriggerMonitor()">Stop Monitor</button>
+        </div>
+        <div id="triggerStatus" class="status info">Click Check để xem trạng thái NPN</div>
+        <div id="triggerMonitor" class="status info">Monitor: Stopped</div>
+    </div>
+
+    <!-- Test Quickshifter Logic -->
+    <div class="test-section">
+        <h3>🚗 Test Quickshifter Logic</h3>
+        <div>
+            <button class="btn btn-success" onclick="checkQSStatus()">Check QS Status</button>
+            <button class="btn btn-primary" onclick="startQSMonitor()">Start QS Monitor</button>
+            <button class="btn btn-danger" onclick="stopQSMonitor()">Stop QS Monitor</button>
+        </div>
+        <div id="qsStatus" class="status info">Click Check để xem trạng thái QS</div>
+        <div id="qsMonitor" class="status info">Monitor: Stopped</div>
+    </div>
+
+    <!-- Configuration -->
+    <div class="test-section">
+        <h3>⚙️ Configuration</h3>
+        <div>
+            <label>Mode: 
+                <select id="mode">
+                    <option value="0">Manual</option>
+                    <option value="1" selected>Auto</option>
+                </select>
+            </label>
+            <label>RPM Min: <input type="number" id="rpm_min" value="2500" min="1000" max="5000"></label>
+            <label>Manual Cut (ms): <input type="number" id="manual_kill_ms" value="65" min="20" max="150"></label>
+            <button class="btn btn-success" onclick="saveConfig()">Save Config</button>
+        </div>
+        <div id="configStatus" class="status info">Click Save để cập nhật cấu hình</div>
+    </div>
+
+    <script>
+        let triggerMonitorInterval = null;
+        let qsMonitorInterval = null;
+
+        // Test RPM
+        async function testRPM() {
+            try {
+                const en = document.getElementById('tr_en').checked ? 1 : 0;
+                const rpm = document.getElementById('tr_rpm').value;
+                const ppr = document.getElementById('tr_ppr').value;
+                
+                const response = await fetch(`/api/testrpm?en=${en}&rpm=${rpm}&ppr=${ppr}`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    document.getElementById('rpmStatus').textContent = `✅ RPM Test OK: ${en ? 'ON' : 'OFF'}, ${rpm} RPM, ${ppr} PPR`;
+                    document.getElementById('rpmStatus').className = 'status success';
+                } else {
+                    document.getElementById('rpmStatus').textContent = `❌ RPM Test Failed: ${response.status}`;
+                    document.getElementById('rpmStatus').className = 'status error';
+                }
+            } catch (e) {
+                document.getElementById('rpmStatus').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('rpmStatus').className = 'status error';
+            }
+        }
+
+        // Test Cut
+        async function testCut(output) {
+            try {
+                const response = await fetch(`/api/testcut?out=${output}`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    document.getElementById('cutStatus').textContent = `✅ ${output.toUpperCase()} Cut Test OK`;
+                    document.getElementById('cutStatus').className = 'status success';
+                } else {
+                    document.getElementById('cutStatus').textContent = `❌ ${output.toUpperCase()} Cut Test Failed: ${response.status}`;
+                    document.getElementById('cutStatus').className = 'status error';
+                }
+            } catch (e) {
+                document.getElementById('cutStatus').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('cutStatus').className = 'status error';
+            }
+        }
+
+        // Check Trigger
+        async function checkTrigger() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                document.getElementById('triggerStatus').textContent = 
+                    `📊 RPM: ${data.rpm}, State: ${data.state}, Can Cut: ${data.can_cut}, Reason: ${data.reason}`;
+                document.getElementById('triggerStatus').className = 'status info';
+            } catch (e) {
+                document.getElementById('triggerStatus').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('triggerStatus').className = 'status error';
+            }
+        }
+
+        // Start Trigger Monitor
+        function startTriggerMonitor() {
+            if (triggerMonitorInterval) return;
+            
+            triggerMonitorInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/api/status');
+                    const data = await response.json();
+                    
+                    document.getElementById('triggerMonitor').textContent = 
+                        `📊 Monitor: RPM=${data.rpm}, State=${data.state}, Can Cut=${data.can_cut}`;
+                    document.getElementById('triggerMonitor').className = 'status info';
+                } catch (e) {
+                    document.getElementById('triggerMonitor').textContent = `❌ Monitor Error: ${e.message}`;
+                    document.getElementById('triggerMonitor').className = 'status error';
+                }
+            }, 1000);
+            
+            document.getElementById('triggerMonitor').textContent = 'Monitor: Running (1s)';
+            document.getElementById('triggerMonitor').className = 'status success';
+        }
+
+        // Stop Trigger Monitor
+        function stopTriggerMonitor() {
+            if (triggerMonitorInterval) {
+                clearInterval(triggerMonitorInterval);
+                triggerMonitorInterval = null;
+                document.getElementById('triggerMonitor').textContent = 'Monitor: Stopped';
+                document.getElementById('triggerMonitor').className = 'status info';
+            }
+        }
+
+        // Check QS Status
+        async function checkQSStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                document.getElementById('qsStatus').textContent = 
+                    `🚗 QS Status: RPM=${data.rpm}, State=${data.state}, Last Cut=${data.last_cut_ms}ms, Holdoff=${data.holdoff_remain_ms}ms`;
+                document.getElementById('qsStatus').className = 'status info';
+            } catch (e) {
+                document.getElementById('qsStatus').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('qsStatus').className = 'status error';
+            }
+        }
+
+        // Start QS Monitor
+        function startQSMonitor() {
+            if (qsMonitorInterval) return;
+            
+            qsMonitorInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/api/status');
+                    const data = await response.json();
+                    
+                    document.getElementById('qsMonitor').textContent = 
+                        `🚗 QS Monitor: RPM=${data.rpm}, State=${data.state}, Can Cut=${data.can_cut}, Reason=${data.reason}`;
+                    document.getElementById('qsMonitor').className = 'status info';
+                } catch (e) {
+                    document.getElementById('qsMonitor').textContent = `❌ QS Monitor Error: ${e.message}`;
+                    document.getElementById('qsMonitor').className = 'status error';
+                }
+            }, 500);
+            
+            document.getElementById('qsMonitor').textContent = 'Monitor: Running (500ms)';
+            document.getElementById('qsMonitor').className = 'status success';
+        }
+
+        // Stop QS Monitor
+        function stopQSMonitor() {
+            if (qsMonitorInterval) {
+                clearInterval(qsMonitorInterval);
+                qsMonitorInterval = null;
+                document.getElementById('qsMonitor').textContent = 'Monitor: Stopped';
+                document.getElementById('qsMonitor').className = 'status info';
+            }
+        }
+
+        // Save Config
+        async function saveConfig() {
+            try {
+                const config = {
+                    mode: parseInt(document.getElementById('mode').value),
+                    rpm_min: parseInt(document.getElementById('rpm_min').value),
+                    manual_kill_ms: parseInt(document.getElementById('manual_kill_ms').value)
+                };
+                
+                const response = await fetch('/api/set', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    document.getElementById('configStatus').textContent = '✅ Configuration saved successfully!';
+                    document.getElementById('configStatus').className = 'status success';
+                } else {
+                    document.getElementById('configStatus').textContent = `❌ Failed to save config: ${response.status}`;
+                    document.getElementById('configStatus').className = 'status error';
+                }
+            } catch (e) {
+                document.getElementById('configStatus').textContent = `❌ Error: ${e.message}`;
+                document.getElementById('configStatus').className = 'status error';
+            }
+        }
+
+        // Auto-check status on load
+        window.onload = function() {
+            checkTrigger();
+            checkQSStatus();
+        };
+    </script>
+</body>
+</html>
