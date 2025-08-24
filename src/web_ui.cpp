@@ -133,13 +133,10 @@ static void handleAPI() {
       return;
     }
     
-    // Lấy config từ body
-    JsonObject configObj = doc["config"];
-    if (!configObj) {
-      req->send(400, "application/json", "{\"ok\":false,\"err\":\"Missing config field\"}");
-      lastHit = millis();
-      return;
-    }
+    // Lấy config từ body: chấp nhận CẢ 2 dạng
+    // 1) {"config": { ... }} (dạng mới)
+    // 2) { ... }            (dạng cũ/đơn giản từ UI)
+    JsonObject configObj = doc["config"].isNull() ? doc.as<JsonObject>() : doc["config"].as<JsonObject>();
     
     // Chuyển config về JSON string để import
     String configJson;
@@ -350,8 +347,15 @@ static void handleAPI() {
       // Bỏ qua để tương thích
     }
     
-    String newPass = d["pass"] | "";
-    uint16_t newTimeout = d["timeout_s"] | 120;
+    // Chấp nhận cả tên trường ap_pass/ap_timeout_s từ UI hiện tại
+    String newPass;
+    if (d["ap_pass"].is<String>())      newPass = (const char*)d["ap_pass"];
+    else if (d["pass"].is<String>())    newPass = (const char*)d["pass"];
+    else                                 newPass = "";
+
+    uint16_t newTimeout = 120;
+    if (d["ap_timeout_s"].is<uint16_t>())      newTimeout = d["ap_timeout_s"].as<uint16_t>();
+    else if (d["timeout_s"].is<uint16_t>())    newTimeout = d["timeout_s"].as<uint16_t>();
     
     // Validation password
     if (newPass.length() > 0 && (newPass.length() < 8 || newPass.length() > 63)) {

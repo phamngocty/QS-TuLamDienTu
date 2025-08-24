@@ -174,6 +174,10 @@
         border-color: #ff4d4d;
         background: #1c1010;
       }
+      .btn.warning {
+        border-color: #ff9800;
+        background: #1a0f00;
+      }
       .table {
         overflow: auto;
         border-radius: 12px;
@@ -207,6 +211,15 @@
         display: inline-block;
       }
       
+      /* Tab content optimization */
+      .tab-content {
+        display: none;
+      }
+      
+      .tab-content.active {
+        display: block;
+      }
+      
       h3 {
         margin: 0 0 12px 0;
         font-size: 16px;
@@ -230,9 +243,7 @@
         border-color: #2a3a42;
       }
       
-      #wifi {
-        display: none;
-      }
+      /* #wifi { display: none; } - BỊ COMMENT ĐỂ TRÁNH CONFLICT VỚI TAB SYSTEM */
       .msg {
         background: #18c37e;
         color: #fff;
@@ -255,7 +266,7 @@
       <div class="dot"></div>
       <h1>Tự làm điện tử — Quickshifter</h1>
       <div class="sp"></div>
-      <button id="btnWifiOff" class="btn-danger">Tắt Wi-Fi</button>
+      <button id="btnWifiOffHeader" class="btn-danger">Tắt Wi-Fi</button>
     </header>
     
     <!-- ======================= BODY ======================= -->
@@ -271,7 +282,7 @@
         </div>
 
         <!-- ========== TAB: QUICKSHIFTER ========== -->
-        <section id="qs">
+        <section id="qs" class="tab-content active">
           <!-- Controls -->
           <div class="row">
             <label>
@@ -412,7 +423,7 @@
         </section>
 
         <!-- ========== TAB: BACKFIRE ========== -->
-        <section id="bf" style="display:none">
+        <section id="bf" class="tab-content">
   <div class="row">
     <label><span>Enable</span><input id="bf_enable" type="checkbox" /></label>
     <label><span>IGN only</span><input id="bf_ign_only" type="checkbox" checked /></label>
@@ -448,7 +459,7 @@
 
 
         <!-- ========== TAB: TOOLS & LOGS ========== -->
-        <section id="tools" style="display: none">
+        <section id="tools" class="tab-content">
           <div class="row">
             <div class="card">
               <h3>Test Output</h3>
@@ -600,7 +611,7 @@
         </section>
 
         <!-- ========== TAB: LOCK ========== -->
-        <section id="lock" style="display: none">
+        <section id="lock" class="tab-content">
             <div class="row">
             <div class="card">
               <h3>Trạng thái Lock</h3>
@@ -612,32 +623,19 @@
               <div class="muted">
                 <small>• <strong>LOCKED</strong>: Hệ thống bị khóa, quickshifter không hoạt động<br>
                 • <strong>UNLOCKED</strong>: Hệ thống mở, quickshifter hoạt động bình thường<br>
-                • Để unlock: nhập pass bằng NPN (short=0, long=1) hoặc dùng API</small>
+                • Để unlock: nhập pass bằng NPN (short=0, long=1) hoặc dùng API<br>
+                • <strong>Lưu ý:</strong> UI không có nút lock/unlock runtime. Lock chỉ được điều khiển qua cấu hình "Enable Lock at boot"</small>
             </div>
           </div>
 
-          <div class="card">
-              <h3>Đổi mật khẩu</h3>
-              <div class="row" style="gap:10px">
-                <input id="old_pass" placeholder="Current pass (0/1)" maxlength="8" />
-                <input id="new_pass" placeholder="New pass (0/1)" maxlength="8" />
-                <input id="new_pass2" placeholder="Repeat new pass" maxlength="8" />
-            </div>
-            <div class="row">
-                <button id="btnLockChange" class="btn">Change Pass</button>
-                <span id="msgLockPass" class="muted"></span>
-            </div>
-              <div class="muted">
-                <small>• Pass chỉ gồm 0 và 1 (ví dụ: 1001)<br>
-                • Short pulse = 0, Long pulse = 1<br>
-                • Đổi pass chỉ khi đã unlock</small>
-            </div>
-            </div>
+          <!-- ĐIỀU KHIỂN LOCK RUNTIME BỊ ẨN THEO NGUYÊN TẮC VÀNG -->
+          <!-- Lock chỉ enable tại boot + nhập pass qua nhịp NPN -->
+          <!-- Không có nút lock/unlock runtime trên UI -->
           </div>
         </section>
 
           <!-- ========== TAB: WI-FI ========== -->
-        <section id="wifi" style="display: none">
+        <section id="wifi" class="tab-content">
           <div class="row">
             <div class="card">
               <h3>Wi-Fi AP Status</h3>
@@ -706,12 +704,44 @@
       const tb = { qs: q("#t_qs"), bf: q("#t_bf"), tools: q("#t_tools"), lock: q("#t_lock"), wifi: q("#t_wifi") };
 
       function setTab(id) {
-        for (const k in tabs) {
-          tabs[k].style.display = k === id ? "block" : "none";
-          tb[k].classList.toggle("active", k === id);
+        try {
+          console.log('setTab called with id:', id);
+          console.log('Available tabs:', Object.keys(tabs));
+          console.log('Available tab buttons:', Object.keys(tb));
+          
+          for (const k in tabs) {
+            if (tabs[k] && tb[k]) {
+              console.log(`Processing tab ${k}:`, tabs[k], tb[k]);
+              // Use CSS classes instead of inline styles for better performance
+              tabs[k].classList.toggle("active", k === id);
+              tb[k].classList.toggle("active", k === id);
+              console.log(`Tab ${k} active:`, tabs[k].classList.contains('active'));
+            }
+          }
+        } catch (e) {
+          console.error("setTab error:", e);
         }
       }
-      // Tab event handlers will be set in init function
+
+      // Tab click delegation - đơn giản và ổn định
+      function setupTabHandlers() {
+        try {
+          // Gán trực tiếp onclick cho từng tab button
+          const tabButtons = document.querySelectorAll('.tab-btn');
+          tabButtons.forEach(btn => {
+            btn.onclick = () => {
+              const id = btn.id.replace('t_', '');
+              if (id && tabs[id]) {
+                console.log('Switching to tab:', id);
+                setTab(id);
+              }
+            };
+          });
+          console.log('Tab handlers setup successfully');
+        } catch (err) {
+          console.error('Tab handler setup error:', err);
+        }
+      }
 
       async function apiGet(p) {
         const r = await fetch(p);
@@ -733,52 +763,57 @@
             await apiText("/api/wifi_off", { method: "POST" });
           }
       }
-      q("#btnWifiOff").onclick = wifiOff;
+      q("#btnWifiOffHeader").onclick = wifiOff;
 
       /* ---------- Config load/save ---------- */
       let cfg = {};
 
       function renderCfg() {
         try {
-          // Core quickshifter config
-          if (q("#mode")) q("#mode").value = cfg.mode;
-          if (q("#cutout")) q("#cutout").value = cfg.cut_output;
-          if (q("#rsrc")) q("#rsrc").value = cfg.rpm_source;
-          if (q("#ppr")) q("#ppr").value = cfg.ppr;
-          if (q("#rpmmin")) q("#rpmmin").value = cfg.rpm_min;
-          if (q("#mkill")) q("#mkill").value = cfg.manual_kill_ms;
-          if (q("#deb")) q("#deb").value = cfg.debounce_shift_ms;
-          if (q("#hold")) q("#hold").value = cfg.holdoff_ms;
+          // Core quickshifter config - null-safe với toán tử ?.
+          q("#mode")?.value = cfg.mode;
+          q("#cutout")?.value = cfg.cut_output;
+          q("#rsrc")?.value = cfg.rpm_source;
+          q("#ppr")?.value = cfg.ppr;
+          q("#rpmmin")?.value = cfg.rpm_min;
+          q("#mkill")?.value = cfg.manual_kill_ms;
+          q("#deb")?.value = cfg.debounce_shift_ms;
+          q("#hold")?.value = cfg.holdoff_ms;
 
-          // Backfire config - with safety checks
-          if (q("#bf_enable")) q("#bf_enable").checked = !!cfg.bf_enable;
-          if (q("#bf_ign_only")) q("#bf_ign_only").checked = cfg.bf_ign_only ?? true;
+          // Backfire config - null-safe
+          q("#bf_enable")?.checked = !!cfg.bf_enable;
+          q("#bf_ign_only")?.checked = cfg.bf_ign_only ?? true;
+          q("#bf_mode_shift")?.checked = (cfg.bf_mode ?? 3) & 0x01;
+          q("#bf_mode_overrun")?.checked = (cfg.bf_mode ?? 3) & 0x02;
+          q("#bf_rpm_min")?.value = cfg.bf_rpm_min ?? 4500;
+          q("#bf_rpm_max")?.value = cfg.bf_rpm_max ?? 9000;
+          q("#bf_warmup_s")?.value = cfg.bf_warmup_s ?? 120;
+          q("#bf_decel_thresh")?.value = cfg.bf_decel_thresh ?? 3000;
+          q("#bf_window_ms")?.value = cfg.bf_window_ms ?? 250;
+          q("#bf_burst_count")?.value = cfg.bf_burst_count ?? 3;
+          q("#bf_burst_on")?.value = cfg.bf_burst_on ?? 25;
+          q("#bf_burst_off")?.value = cfg.bf_burst_off ?? 75;
+          q("#bf_refractory_ms")?.value = cfg.bf_refractory_ms ?? 1500;
 
-          if (q("#bf_mode_shift")) q("#bf_mode_shift").checked = (cfg.bf_mode ?? 3) & 0x01;
-          if (q("#bf_mode_overrun")) q("#bf_mode_overrun").checked = (cfg.bf_mode ?? 3) & 0x02;
+          // Lock config - null-safe
+          q("#lock_enabled")?.checked = cfg.lock_enabled;
+          q("#lock_cut_sel")?.value = cfg.lock_cut_sel || "ign";
+          q("#lock_short_ms_max")?.value = cfg.lock_short_ms_max ?? 300;
+          q("#lock_long_ms_min")?.value = cfg.lock_long_ms_min ?? 600;
+          q("#lock_gap_ms")?.value = cfg.lock_gap_ms ?? 400;
+          q("#lock_timeout_s")?.value = cfg.lock_timeout_s ?? 30;
+          q("#lock_max_retries")?.value = cfg.lock_max_retries ?? 5;
 
-          if (q("#bf_rpm_min")) q("#bf_rpm_min").value = cfg.bf_rpm_min ?? 4500;
-          if (q("#bf_rpm_max")) q("#bf_rpm_max").value = cfg.bf_rpm_max ?? 9000;
-          if (q("#bf_warmup_s")) q("#bf_warmup_s").value = cfg.bf_warmup_s ?? 120;
-
-          if (q("#bf_decel_thresh")) q("#bf_decel_thresh").value = cfg.bf_decel_thresh ?? 3000;
-          if (q("#bf_window_ms")) q("#bf_window_ms").value = cfg.bf_window_ms ?? 250;
-
-          if (q("#bf_burst_count")) q("#bf_burst_count").value = cfg.bf_burst_count ?? 3;
-          if (q("#bf_burst_on")) q("#bf_burst_on").value = cfg.bf_burst_on ?? 25;
-          if (q("#bf_burst_off")) q("#bf_burst_off").value = cfg.bf_burst_off ?? 75;
-          if (q("#bf_refractory_ms")) q("#bf_refractory_ms").value = cfg.bf_refractory_ms ?? 1500;
-
-          // Auto Map table - with safety check
+          // Auto Map table - null-safe
           const tbody = q("#map");
           if (tbody) {
             tbody.innerHTML = "";
             (cfg.map || []).forEach((b) => {
               const tr = document.createElement("tr");
               tr.innerHTML = `
-                <td><input type="number" value="${b.lo}"></td>
-                <td><input type="number" value="${b.hi}"></td>
-                <td><input type="number" value="${b.t}"></td>`;
+                <td><input type="number" value="${b.lo || 0}"></td>
+                <td><input type="number" value="${b.hi || 0}"></td>
+                <td><input type="number" value="${b.t || 50}"></td>`;
               tbody.appendChild(tr);
             });
           }
@@ -789,48 +824,85 @@
       }
 
       function collectCfg() {
-        // Core config - with safety checks
-        cfg.mode = q("#mode") ? +q("#mode").value : cfg.mode;
-        cfg.cut_output = q("#cutout") ? +q("#cutout").value : cfg.cut_output;
-        cfg.rpm_source = q("#rsrc") ? +q("#rsrc").value : cfg.rpm_source;
-        cfg.ppr = q("#ppr") ? parseFloat(q("#ppr").value) : cfg.ppr;
-        cfg.rpm_min = q("#rpmmin") ? +q("#rpmmin").value : cfg.rpm_min;
-        cfg.manual_kill_ms = q("#mkill") ? +q("#mkill").value : cfg.manual_kill_ms;
-        cfg.debounce_shift_ms = q("#deb") ? +q("#deb").value : cfg.debounce_shift_ms;
-        cfg.holdoff_ms = q("#hold") ? +q("#hold").value : cfg.holdoff_ms;
+        try {
+          // Core config - null-safe với toán tử ?.
+          cfg.mode = +q("#mode")?.value || cfg.mode || 0;
+          cfg.cut_output = +q("#cutout")?.value || cfg.cut_output || 0;
+          cfg.rpm_source = +q("#rsrc")?.value || cfg.rpm_source || 0;
+          cfg.ppr = parseFloat(q("#ppr")?.value || cfg.ppr || 1.0);
+          cfg.rpm_min = +q("#rpmmin")?.value || cfg.rpm_min || 1000;
+          cfg.manual_kill_ms = +q("#mkill")?.value || cfg.manual_kill_ms || 50;
+          cfg.debounce_shift_ms = +q("#deb")?.value || cfg.debounce_shift_ms || 10;
+          cfg.holdoff_ms = +q("#hold")?.value || cfg.holdoff_ms || 100;
 
-        // Backfire config - with safety checks
-        let mode = 0;
-        if (q("#bf_mode_shift")?.checked)   mode |= 0x01;   // BF_SHIFT
-        if (q("#bf_mode_overrun")?.checked) mode |= 0x02;   // BF_OVERRUN
+          // Backfire config - null-safe
+          let mode = 0;
+          if (q("#bf_mode_shift")?.checked)   mode |= 0x01;   // BF_SHIFT
+          if (q("#bf_mode_overrun")?.checked) mode |= 0x02;   // BF_OVERRUN
 
-        cfg.bf_enable        = q("#bf_enable")?.checked ? 1 : 0;
-        cfg.bf_ign_only      = q("#bf_ign_only")?.checked ? 1 : 0;
-        cfg.bf_mode          = mode;
+          cfg.bf_enable        = q("#bf_enable")?.checked ? 1 : 0;
+          cfg.bf_ign_only      = q("#bf_ign_only")?.checked ?? true ? 1 : 0;
+          cfg.bf_mode          = mode;
 
-        cfg.bf_rpm_min       = +(q("#bf_rpm_min")?.value || 4500);
-        cfg.bf_rpm_max       = +(q("#bf_rpm_max")?.value || 9000);
-        cfg.bf_warmup_s      = +(q("#bf_warmup_s")?.value || 120);
+          cfg.bf_rpm_min       = +q("#bf_rpm_min")?.value || 4500;
+          cfg.bf_rpm_max       = +q("#bf_rpm_max")?.value || 9000;
+          cfg.bf_warmup_s      = +q("#bf_warmup_s")?.value || 120;
 
-        cfg.bf_decel_thresh  = +(q("#bf_decel_thresh")?.value || 3000);
-        cfg.bf_window_ms     = +(q("#bf_window_ms")?.value || 250);
+          cfg.bf_decel_thresh  = +q("#bf_decel_thresh")?.value || 3000;
+          cfg.bf_window_ms     = +q("#bf_window_ms")?.value || 250;
 
-        cfg.bf_burst_count   = +(q("#bf_burst_count")?.value || 3);
-        cfg.bf_burst_on      = +(q("#bf_burst_on")?.value || 25);
-        cfg.bf_burst_off     = +(q("#bf_burst_off")?.value || 75);
-        cfg.bf_refractory_ms = +(q("#bf_refractory_ms")?.value || 1500);
-        q("#btnSaveBF").onclick = save;
+          cfg.bf_burst_count   = +q("#bf_burst_count")?.value || 3;
+          cfg.bf_burst_on      = +q("#bf_burst_on")?.value || 25;
+          cfg.bf_burst_off     = +q("#bf_burst_off")?.value || 75;
+          cfg.bf_refractory_ms = +q("#bf_refractory_ms")?.value || 1500;
 
+          // Lock config - null-safe
+          cfg.lock_enabled = q("#lock_enabled")?.checked ?? false;
+          cfg.lock_cut_sel = q("#lock_cut_sel")?.value || "ign";
+          cfg.lock_short_ms_max = +q("#lock_short_ms_max")?.value || 300;
+          cfg.lock_long_ms_min = +q("#lock_long_ms_min")?.value || 600;
+          cfg.lock_gap_ms = +q("#lock_gap_ms")?.value || 400;
+          cfg.lock_timeout_s = +q("#lock_timeout_s")?.value || 30;
+          cfg.lock_max_retries = +q("#lock_max_retries")?.value || 5;
 
-        // Auto Map collection - with safety check
-        cfg.map = [];
-        const rows = document.querySelectorAll("#map tr");
-        rows.forEach((tr) => {
-          const t = tr.querySelectorAll("input");
-          if (t.length >= 3) {
-            cfg.map.push({ lo: +t[0].value, hi: +t[1].value, t: +t[2].value });
+          // Auto Map collection - null-safe
+          cfg.map = [];
+          const rows = qa("#map tr");
+          rows?.forEach((tr) => {
+            const t = tr.querySelectorAll("input");
+            if (t?.length >= 3) {
+              const lo = +t[0].value || 0;
+              const hi = +t[1].value || 0;
+              const time = +t[2].value || 50;
+              if (lo > 0 && hi > lo && time >= 20 && time <= 150) {
+                cfg.map.push({ lo, hi, t: time });
+              }
+            }
+          });
+
+          // Sanitize config values
+          if (cfg.ppr !== 0.5 && cfg.ppr !== 1 && cfg.ppr !== 2) {
+            cfg.ppr = 1.0;
+            console.warn("Invalid PPR value, using default 1.0");
           }
-        });
+          
+          if (cfg.manual_kill_ms < 20 || cfg.manual_kill_ms > 150) {
+            cfg.manual_kill_ms = Math.max(20, Math.min(150, cfg.manual_kill_ms));
+            console.warn("Manual kill time clamped to 20-150ms");
+          }
+
+          // Sort and sanitize auto map
+          cfg.map.sort((a, b) => a.lo - b.lo);
+          for (let i = 1; i < cfg.map.length; i++) {
+            if (cfg.map[i].lo <= cfg.map[i-1].hi) {
+              cfg.map[i].lo = cfg.map[i-1].hi + 1;
+            }
+          }
+
+        } catch (e) {
+          console.error("collectCfg error:", e);
+          toast(false, "Config collection error: " + e.message);
+        }
       }
 
       async function load() {
@@ -1144,15 +1216,18 @@ if (redFrom != null && redFrom < GA.MAX) {
       });
 
 
-      q("#btnLockChange")?.addEventListener("click", async ()=>{
-        const op = only01(q("#old_pass").value);
-        const np1 = only01(q("#new_pass").value);
-        const np2 = only01(q("#new_pass2").value);
-        if (!op || !np1 || np1!==np2){ q("#msgLockPass").textContent="Kiểm tra pass"; setTimeout(()=> q("#msgLockPass").textContent="", 1200); return; }
-        const t = await apiText("/api/lock_change_pass", {method:"POST", body: JSON.stringify({old: op, neo: np1})});
-        q("#msgLockPass").textContent = t || "Đổi OK";
-        setTimeout(()=> q("#msgLockPass").textContent="", 1200);
-      });
+      // ĐIỀU KHIỂN LOCK RUNTIME BỊ ẨN THEO NGUYÊN TẮC VÀNG
+      // Lock chỉ enable tại boot + nhập pass qua nhịp NPN
+      // Không có nút lock/unlock runtime trên UI
+      // q("#btnLockChange")?.addEventListener("click", async ()=>{
+      //   const op = only01(q("#old_pass").value);
+      //   const np1 = only01(q("#new_pass").value);
+      //   const np2 = only01(q("#new_pass2").value);
+      //   if (!op || !np1 || np1!==np2){ q("#msgLockPass").textContent="Kiểm tra pass"; setTimeout(()=> q("#msgLockPass").textContent="", 1200); return; }
+      //   const t = await apiText("/api/lock_change_pass", {method:"POST", body: JSON.stringify({old: op, neo: np1})});
+      //   q("#msgLockPass").textContent = t || "Đổi OK";
+      //   setTimeout(()=> q("#msgLockPass").textContent="", 1200);
+      // });
 
       // ---------- OTA Event Handlers ----------
       // OTA State
@@ -1548,30 +1623,38 @@ if (redFrom != null && redFrom < GA.MAX) {
         setTimeout(async () => {
           try {
             await apiText("/api/ota/mark_valid", { method: "POST" });
-            console.log("Firmware marked as valid");
+            // Firmware marked as valid
           } catch (error) {
-            console.log("Could not mark firmware as valid:", error);
+            // Could not mark firmware as valid
           }
         }, 5000);
         
-        // Gauge config + polling
-        configureGauge({ start: GA.START, end: GA.END, max: 14000, redFrom: 12000 });
+        // Gauge config + polling - 8h → 3h (start: 240, end: 30)
+        configureGauge({ start: 240, end: 30, max: 14000, redFrom: 12000 });
         rpmSmooth = 0;
         setGauge(0);                 // cho kim về 0 ngay (→ 240°)
         setInterval(pollRPM, 200);   // rồi mới poll
         
-        // Setup tab event handlers AFTER DOM is ready
-        console.log("Setting up tab handlers...");
-        console.log("tb.qs element:", tb.qs);
-        console.log("tabs.qs element:", tabs.qs);
+        // Setup tab handlers AFTER DOM is ready
+        console.log('DOM ready, setting up tabs...');
+        console.log('Tabs object:', tabs);
+        console.log('Tab buttons object:', tb);
+        setupTabHandlers();
         
-        if (tb.qs) tb.qs.onclick = () => { console.log("QS clicked"); setTab("qs"); };
-        if (tb.bf) tb.bf.onclick = () => { console.log("BF clicked"); setTab("bf"); };
-        if (tb.tools) tb.tools.onclick = () => { console.log("Tools clicked"); setTab("tools"); };
-        if (tb.lock) tb.lock.onclick = () => { console.log("Lock clicked"); setTab("lock"); };
-        if (tb.wifi) tb.wifi.onclick = () => { console.log("WiFi clicked"); setTab("wifi"); };
+        // Giữ/nhả AP khi người dùng rời/trở lại tab
+        document.addEventListener("visibilitychange", ()=>{
+          if (document.hidden) {
+            apiText("/api/wifi_hold?on=0", { method:"POST" }).catch(()=>{});
+          } else {
+            apiText("/api/wifi_hold?on=1", { method:"POST" }).catch(()=>{});
+          }
+        });
         
-        console.log("Tab handlers initialized");
+        window.addEventListener("beforeunload", ()=>{
+          if (navigator.sendBeacon) {
+            navigator.sendBeacon("/api/wifi_hold?on=0");
+          }
+        });
       })();
 
 

@@ -1,9 +1,3 @@
-
-
-đây là **MASTER PROMPT** (tiếng Việt) bạn có thể dán vào Cursor/ChatGPT để mọi người/AI nắm mục tiêu dự án và làm việc thống nhất từ đầu đến cuối.
-
----
-
 # MASTER PROMPT — ESP32-C3 Quickshifter (Winner X 150, 1 xi-lanh)
 
 ## Vai trò & ngôn ngữ
@@ -19,7 +13,6 @@ Tạo **quickshifter** cho xe 1 xi-lanh (vd Winner X 150) cắt **IGN** (mobin s
 * **PlatformIO**; **LittleFS**; `board_build.filesystem = littlefs`; `board_build.partitions = default_ota.csv` (2 OTA app + LittleFS).
 * **AP Wi-Fi** bật khi khởi động; tự tắt sau `ap_timeout_s` (≈ 120s). Có `GET /api/wifi_hold?on=1|0` để giữ AP khi thao tác lâu.
 * **NPN (shift)**:
-
   * `TRIG::rawLevel()` = đọc pin **không debounce** (dùng cho đọc pass Lock).
   * `TRIG::pressed()` = **có debounce** (dùng cho quickshifter).
 * **PPR** ∈ {0.5, 1, 2}; sai → dùng **1.0** và log cảnh báo.
@@ -29,8 +22,7 @@ Tạo **quickshifter** cho xe 1 xi-lanh (vd Winner X 150) cắt **IGN** (mobin s
 
 ## LOCK (chống trộm/khóa an toàn) — nguyên tắc vàng
 
-* **Chỉ có** tùy chọn **“Enable Lock at boot”** trong **Cấu hình**:
-
+* **Chỉ có** tùy chọn **"Enable Lock at boot"** trong **Cấu hình**:
   * **Bật**: Khi boot → **LOCKED**. Chỉ khi nhập **pass bằng NPN** (chuỗi nhịp **ngắn=0 / dài=1**) đúng `lock_code` mới **UNLOCK**.
   * **Tắt**: Không dùng Lock; **NPN & quickshifter hoạt động bình thường**.
 * **UI không có** nút Lock/Unlock runtime và **không tự động** gọi `/api/lock_cmd`.
@@ -40,7 +32,6 @@ Tạo **quickshifter** cho xe 1 xi-lanh (vd Winner X 150) cắt **IGN** (mobin s
 
 * Đủ các trường: `mode`, `rpm_source`, `ppr`, `rpm_min`, `manual_kill_ms`, `debounce_shift_ms`, `holdoff_ms`, `ap_timeout_s`, `rpm_scale`, **lock\_**\* (`lock_enabled`, `lock_code` chỉ **0/1**, ≤ 8 ký tự; `lock_cut_sel`; `lock_short_ms_max`; `lock_long_ms_min`; `lock_gap_ms`; `lock_timeout_s`; `lock_max_retries`), **auto map** (mảng `{lo,hi,t}`), các tham số backfire (nếu dùng).
 * **Sanitize**:
-
   * `ppr` chỉ 0.5/1/2; khác → 1.0.
   * `lock_short_ms_max < lock_long_ms_min`; clamp ms 10..2000.
   * Auto Map: sort theo `lo`, **khử chồng lấn** (đẩy `lo = prev.hi + 1` nếu cần), clamp `t` 20..150.
@@ -49,21 +40,19 @@ Tạo **quickshifter** cho xe 1 xi-lanh (vd Winner X 150) cắt **IGN** (mobin s
 ## UI (data/index.html)
 
 * Tabs: **Quickshifter**, **Auto Map**, **Tools & Logs**, **Lock**, **Wi-Fi** (hoặc tương đương).
-* **renderCfg/collectCfg** phải **an toàn**: không truy cập phần tử không tồn tại (null-safe + `try/catch`). **Không để lỗi JS làm “đứng” tabs**.
+* **renderCfg/collectCfg** phải **an toàn**: không truy cập phần tử không tồn tại (null-safe + `try/catch`). **Không để lỗi JS làm "đứng" tabs**.
 * Sửa **ID trùng** (vd `btnWifiOff` header vs tab).
 * **Không** auto gọi `/api/lock_cmd` từ checkbox cấu hình.
 
 ## OTA (an toàn, không gián đoạn)
 
 * **Endpoints**:
-
   * `POST /api/ota/firmware` (multipart field `update`) → `Update.begin(UPDATE_SIZE_UNKNOWN)` → `Update.end(true)` → set **pending validate** → reboot.
   * `POST /api/ota/fsimage` (LittleFS) → `Update.begin(UPDATE_SIZE_UNKNOWN, U_SPIFFS)` → reboot.
   * `POST /api/upload?path=/index.html` → ghi file lẻ, **không reboot**.
   * `GET /api/ota/state`, `POST /api/ota/mark_valid`, `POST /api/ota/rollback_fw`, `POST /api/ota/backup_fs`, `POST /api/ota/rollback_fs`.
 * **UI có progress bar** (XHR `upload.onprogress`) cho Firmware/FS/Upload file. Trong OTA, gọi `wifi_hold=1`, xong thì `wifi_hold=0`.
 * **Backup/rollback**:
-
   * FS: snapshot toàn bộ (nếu đủ chỗ) hoặc **partial** (index.html/assets/config).
   * FW: A/B + validate window 30s; nếu UI không lên để gọi `mark_valid` → **auto rollback**.
 
@@ -80,17 +69,15 @@ Tạo **quickshifter** cho xe 1 xi-lanh (vd Winner X 150) cắt **IGN** (mobin s
 
 1. **Thảo luận phương án tối ưu** (UI, logic, phần cứng, hiệu năng/ổn định) ngắn gọn, có bullets.
 2. Sau đó **thực thi từng bước nhỏ** (commit/PR nhỏ), ưu tiên:
-
    * Bước 1: Sửa **index.html** để tabs hoạt động (null-safe, try/catch, sửa ID trùng, không auto lock\_cmd).
    * Bước 2: **Lock UX** đúng nguyên tắc vàng ở trên.
    * Bước 3: **Config JSON + Auto Map** (sanitize + round-trip).
    * Bước 4: **OTA** (progress + backup/rollback).
    * Bước 5: Tối ưu đọc RPM (nếu cần: RMT + Schmitt/optocoupler).
 3. **Mỗi bước** phải kèm:
-
    * **Unified diff** các file thay đổi.
    * **Hướng dẫn build** (`pio run -t buildfs && pio run`) và (nếu có) **lệnh OTA/upload**.
-   * **Checklist Acceptance** (test cases) đạt theo mục “Kiểm thử” dưới.
+   * **Checklist Acceptance** (test cases) đạt theo mục "Kiểm thử" dưới.
 
 ## Kiểm thử (Acceptance)
 
@@ -114,7 +101,6 @@ Tạo **quickshifter** cho xe 1 xi-lanh (vd Winner X 150) cắt **IGN** (mobin s
 
 * GitHub: `https://github.com/phamngocty/QS-TuLamDienTu.git`
 * Không yêu cầu nén .zip. Với web:
-
   * Upload 1 file: `curl -F "file=@data/index.html" "http://192.168.4.1/api/upload?path=/index.html"`
   * OTA FS: `curl -F "update=@.pio/build/<env>/littlefs.bin" http://192.168.4.1/api/ota/fsimage`
   * OTA FW: `curl -F "update=@.pio/build/<env>/firmware.bin" http://192.168.4.1/api/ota/firmware`
