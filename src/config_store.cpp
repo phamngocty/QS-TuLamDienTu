@@ -31,9 +31,7 @@ namespace CFG {
     g_cfg.cut_output = (CutOutputSel)prefs.getUChar("cut_out", 0);
     
     g_cfg.backfire_enabled = prefs.getBool("bf_en", false);
-    g_cfg.bf_burst_on = prefs.getUShort("bf_on", 25);
-    g_cfg.bf_burst_off = prefs.getUShort("bf_off", 75);
-    g_cfg.bf_refractory_ms = prefs.getUShort("bf_ref", 1500);
+    // Backfire OFF mặc định - không load các trường cũ
     
     // Load Auto Map
     int map_count = prefs.getInt("map_count", 0);
@@ -85,9 +83,7 @@ namespace CFG {
     prefs.putUChar("cut_out", (uint8_t)cfg.cut_output);
     
     prefs.putBool("bf_en", cfg.backfire_enabled);
-    prefs.putUShort("bf_on", cfg.bf_burst_on);
-    prefs.putUShort("bf_off", cfg.bf_burst_off);
-    prefs.putUShort("bf_ref", cfg.bf_refractory_ms);
+    // Backfire OFF mặc định - không save các trường cũ
     
     // Save Auto Map
     prefs.putInt("map_count", cfg.map_count);
@@ -131,9 +127,7 @@ namespace CFG {
     d["cut_output"]          = (uint8_t)g_cfg.cut_output;
     
     d["backfire_enabled"]    = g_cfg.backfire_enabled;
-    d["bf_burst_on"]         = g_cfg.bf_burst_on;
-    d["bf_burst_off"]        = g_cfg.bf_burst_off;
-    d["bf_refractory_ms"]    = g_cfg.bf_refractory_ms;
+    // Backfire OFF mặc định - không export các trường cũ
     
     // Auto Map
     JsonArray mapArray = d["map"].to<JsonArray>();
@@ -148,6 +142,10 @@ namespace CFG {
     d["ap_ssid"]             = g_cfg.ap_ssid;
     d["ap_pass"]             = includeSecret ? g_cfg.ap_pass : "***"; // Chỉ trả password khi includeSecret = true
     d["ap_timeout_s"]        = g_cfg.ap_timeout_s;
+    
+    // Lock status (runtime)
+    d["vehicle_locked"]      = g_cfg.vehicle_locked;
+    d["has_password"]        = g_cfg.has_password;
     
     return serializeJson(d, out) > 0;
   }
@@ -191,9 +189,7 @@ namespace CFG {
     if (d["cut_output"].is<uint8_t>()) c.cut_output = (CutOutputSel)d["cut_output"].as<uint8_t>();
     
     if (d["backfire_enabled"].is<bool>()) c.backfire_enabled = d["backfire_enabled"];
-    if (d["bf_burst_on"].is<uint16_t>()) c.bf_burst_on = d["bf_burst_on"];
-    if (d["bf_burst_off"].is<uint16_t>()) c.bf_burst_off = d["bf_burst_off"];
-    if (d["bf_refractory_ms"].is<uint16_t>()) c.bf_refractory_ms = d["bf_refractory_ms"];
+    // Backfire OFF mặc định - không import các trường cũ
     
     // Auto Map
     if (d["map"].is<JsonArray>()) {

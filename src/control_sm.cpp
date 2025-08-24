@@ -8,7 +8,13 @@
 #include "pwm_test.h"
 #include "lock_guard.h"
 
-static State st = State::IDLE; static uint32_t tEntry=0; static uint16_t lastCut=0; static bool armedEdge=false;
+static State st = State::IDLE; 
+static uint32_t tEntry=0; 
+static uint16_t lastCut=0; 
+static bool armedEdge=false;
+static uint32_t lastCutTime=0;        // Thời điểm cắt cuối cùng
+static uint16_t holdoffRemainMs=0;    // Thời gian holdoff còn lại
+static const char* cutReason="ok";    // Lý do cắt/không cắt
 
 static uint16_t lookupCut(uint16_t rpm, const QSConfig &c){
   // manual
@@ -28,6 +34,26 @@ static void pushLog(uint16_t rpm, uint16_t cut, bool autoMode, bool bf, CutOutpu
 
 void CTRL::begin(){ st=State::IDLE; tEntry=millis(); }
 
+// ===== Debug functions =====
+uint16_t CTRL::getCurrentRPM() { return RPM::get(); }
+const char* CTRL::getCurrentState() {
+  switch(st) {
+    case State::IDLE: return "IDLE";
+    case State::ARMED: return "ARMED";
+    case State::CUT: return "CUT";
+    case State::RECOVER: return "RECOVER";
+    default: return "UNKNOWN";
+  }
+}
+uint16_t CTRL::getLastCutMs() { return lastCut; }
+uint16_t CTRL::getHoldoffRemainMs() { return holdoffRemainMs; }
+bool CTRL::canCutNow() { 
+  QSConfig cfg = CFG::get();
+  uint16_t rpm = RPM::get();
+  return (rpm >= cfg.rpm_min) && (st == State::IDLE);
+}
+const char* CTRL::getCutReason() { return cutReason; }
+
 void CTRL::tick(){
 
   QSConfig cfg = CFG::get();
@@ -40,33 +66,56 @@ void CTRL::tick(){
 
   switch(st){
     case State::IDLE:
-      if (TRIG::pressed()) { st=State::ARMED; tEntry=millis(); armedEdge=true; }
+      if (TRIG::pressed()) { 
+        st=State::ARMED; 
+        tEntry=millis(); 
+        armedEdge=true; 
+        cutReason="triggered";
+      }
       break;
 
     case State::ARMED: {
       bool ok = (rpm >= cfg.rpm_min);
-      if (!ok) { st=State::IDLE; break; }
+      if (!ok) { 
+        cutReason="below_rpm_min";
+        st=State::IDLE; 
+        break; 
+      }
+      
       // proceed to CUT
-      st=State::CUT; tEntry=millis();
+      st=State::CUT; 
+      tEntry=millis();
+      cutReason="cutting";
+      
       uint16_t cut = lookupCut(rpm, cfg);
       bool useIgn = (cfg.cut_output==CutOutputSel::IGN);
       bool bf = false;
       if (cfg.backfire_enabled && rpm >= cfg.backfire_min_rpm){
-        bf = true; useIgn = true; // force IGN to keep fuel flowing
+        bf = true; 
+        useIgn = true; // force IGN to keep fuel flowing
         cut = min<uint16_t>(CUT_MS_MAX, (uint16_t)(cut + cfg.backfire_extra_ms));
       }
       cut = constrain(cut, CUT_MS_MIN, CUT_MS_MAX);
-      // Do cut
-      CUT::set(useIgn? CutLine::IGN : CutLine::INJ, true); // open relay (cut)
-      delay(cut);
-      CUT::set(useIgn? CutLine::IGN : CutLine::INJ, false); // release
+      
+      // Do cut (non-blocking)
+      CUT::pulse(useIgn? CutLine::IGN : CutLine::INJ, cut);
       lastCut = cut;
+      lastCutTime = millis();
       pushLog(rpm, cut, cfg.mode==Mode::AUTO, bf, cfg.cut_output, "shift");
-      st=State::RECOVER; tEntry=millis();
+      st=State::RECOVER; 
+      tEntry=millis();
     } break;
 
     case State::RECOVER:
-      if ((millis()-tEntry) >= CFG::get().holdoff_ms) { st=State::IDLE; }
+      uint32_t elapsed = millis() - tEntry;
+      if (elapsed >= CFG::get().holdoff_ms) { 
+        st=State::IDLE; 
+        cutReason="ok";
+        holdoffRemainMs = 0;
+      } else {
+        holdoffRemainMs = CFG::get().holdoff_ms - elapsed;
+        cutReason="holdoff";
+      }
       break;
   }
  

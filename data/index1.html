@@ -1,0 +1,2390 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1"
+    />
+    <title>ESP32-C3 Quickshifter</title>
+
+    <style>
+      :root {
+        --bg: #0b0f10;
+        --card: #11161a;
+        --muted: #2a3238;
+        --text: #e8eef2;
+        --sub: #a6b3bd;
+        --accent: #f3c316;
+        --primary: #1e88ff;
+        --danger: #ff4d4d;
+        --ok: #18c37e;
+        --br: 14px;
+        --pad: 12px;
+        --gap: 10px;
+        --shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: linear-gradient(180deg, #0b0f10, #0e1418);
+        color: var(--text);
+        font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif;
+      }
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: linear-gradient(90deg, #0b0f10, #0e1418);
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 1px solid #182127;
+        box-shadow: var(--shadow);
+      }
+      header .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 12px var(--accent);
+      }
+      header h1 {
+        font-size: 18px;
+        margin: 0;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+      }
+      header .sp {
+        flex: 1;
+      }
+      header .btn-danger {
+        background: var(--danger);
+        border: none;
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 10px;
+        cursor: pointer;
+      }
+      main {
+        padding: 16px;
+        display: grid;
+        gap: var(--gap);
+        grid-template-columns: 1fr;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid #1b242b;
+        border-radius: var(--br);
+        padding: var(--pad);
+        box-shadow: var(--shadow);
+      }
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .tab {
+        border: 1px solid #22303a;
+        background: #0f151a;
+        color: var(--text);
+        padding: 8px 12px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .tab:hover {
+        background: #1a2328;
+        border-color: #2a3a44;
+      }
+      .tab[aria-selected="true"] {
+        border-color: var(--primary);
+        background: #0f1720;
+        box-shadow: 0 0 0 2px rgba(30, 136, 255, 0.25);
+      }
+      [role="tabpanel"][hidden] {
+        display: none !important;
+      }
+      .row {
+        display: grid;
+        gap: var(--gap);
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--sub);
+      }
+      input,
+      select {
+        background: #0f151a;
+        color: #fff;
+        border: 1px solid #24323b;
+        border-radius: 10px;
+        padding: 8px 10px;
+        outline: none;
+      }
+      input:focus,
+      select:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 2px rgba(30, 136, 255, 0.25);
+      }
+      .btn {
+        border: 1px solid #22303a;
+        background: #121a1f;
+        color: var(--text);
+        padding: 8px 12px;
+        border-radius: 10px;
+        cursor: pointer;
+      }
+      .btn.primary {
+        border-color: var(--primary);
+        background: #0f1720;
+      }
+      .btn.accent {
+        border-color: #f3c316;
+        background: #17160a;
+      }
+      .btn.ok {
+        border-color: #18c37e;
+        background: #0f1915;
+      }
+      .btn.danger {
+        border-color: #ff4d4d;
+        background: #1c1010;
+      }
+      .table {
+        overflow: auto;
+        border-radius: 12px;
+        border: 1px solid #22303a;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th,
+      td {
+        padding: 8px 10px;
+        border-bottom: 1px solid #1e2a32;
+        text-align: left;
+      }
+      pre {
+        white-space: pre-wrap;
+        background: #0a0f12;
+        border: 1px solid #1b242b;
+        border-radius: 12px;
+        padding: 10px;
+        max-height: 260px;
+        overflow: auto;
+      }
+      .muted {
+        color: var(--sub);
+      }
+      @media (min-width: 900px) {
+        main {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      
+      /* Toast notification */
+      .toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 1000;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease;
+        pointer-events: none; /* Không che click */
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateX(0);
+      }
+      .toast.ok {
+        background: var(--ok);
+      }
+      .toast.fail {
+        background: var(--danger);
+      }
+      
+      /* Lock tab content */
+      .lock-tab-content {
+        display: none;
+      }
+      .lock-tab-content.active {
+        display: block;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- ====================== HEADER ====================== -->
+    <header>
+      <div class="dot"></div>
+      <h1>Tự làm điện tử — Quickshifter</h1>
+      <div class="sp"></div>
+      <button id="btnWifiOff" class="btn-danger">Tắt Wi-Fi</button>
+    </header>
+
+    <!-- Toast notification -->
+    <div id="toast" class="toast"></div>
+    
+    <!-- ======================= BODY ======================= -->
+    <main>
+      <div class="card">
+        <!-- -------- Tabs -------- -->
+        <div class="tabs" role="tablist" aria-label="QS Tabs">
+          <button class="tab" role="tab" data-tab="quickshifter" aria-controls="panel-quickshifter" aria-selected="true">Quickshifter</button>
+          <button class="tab" role="tab" data-tab="backfire" aria-controls="panel-backfire">Backfire</button>
+          <button class="tab" role="tab" data-tab="tools" aria-controls="panel-tools">Tools & Logs</button>
+          <button class="tab" role="tab" data-tab="lock" aria-controls="panel-lock">Lock</button>
+          <button class="tab" role="tab" data-tab="config" aria-controls="panel-config">Config</button>
+          <button class="tab" role="tab" data-tab="wifi" aria-controls="panel-wifi">Wi-Fi</button>
+        </div>
+
+        <!-- ========== TAB: QUICKSHIFTER ========== -->
+        <section id="panel-quickshifter" role="tabpanel" data-panel="quickshifter">
+          <!-- Controls -->
+          <div class="row">
+            <label>
+              Mode
+              <select id="mode">
+                <option value="0">Manual</option>
+                <option value="1">Auto</option>
+              </select>
+            </label>
+
+            <label>
+              Cut Output
+              <select id="cutout">
+                <option value="0">Ignition</option>
+                <option value="1">Injector</option>
+              </select>
+            </label>
+
+            <label>
+              RPM Source
+              <select id="rsrc">
+                <option value="0">Coil</option>
+                <option value="1">Injector</option>
+              </select>
+            </label>
+
+            <label>
+              PPR
+              <select id="ppr">
+                <option>0.5</option>
+                <option selected>1</option>
+                <option>2</option>
+              </select>
+            </label>
+
+            <label>RPM min <input id="rpmmin" type="number" value="2500" /></label>
+            <label>Manual kill (ms) <input id="mkill" type="number" value="70" /></label>
+            <label>Debounce shift (ms) <input id="deb" type="number" value="15" /></label>
+            <label>Hold-off (ms) <input id="hold" type="number" value="200" /></label>
+          </div>
+
+          <!-- Live RPM Gauge -->
+          <div id="rpmCard" class="card" style="margin-top: 10px">
+            <h3>Live RPM</h3>
+
+            <div class="rpm-wrap" style="display: grid; place-items: center; padding: 10px">
+  <svg
+    id="rpmGauge"
+    viewBox="0 0 240 240"
+    width="100%"
+    style="max-width: 420px"
+  >
+<!-- track (8h → 3h, cung dài 210°) -->
+<path
+  id="trackPath"
+  fill="none"
+  stroke="#24323B"
+  stroke-width="16"
+  stroke-linecap="round"
+  d="M 42.060 165.000 A 90 90 0 1 1 210.000 120.000"
+/>
+<g id="rpmTicks" stroke="#2A3238"></g>
+
+<!-- value arc (8h → 3h) -->
+<path
+  id="rpmArc"
+  fill="none"
+  stroke="#1E88FF"
+  stroke-width="16"
+  stroke-linecap="round"
+  stroke-dasharray="0 999"
+  d="M 42.060 165.000 A 90 90 0 1 1 210.000 120.000"
+/>
+
+
+
+    <!-- kim -->
+    <line
+      id="rpmNeedle"
+      x1="120"
+      y1="120"
+      x2="120"
+      y2="35"
+      stroke="#FFEB3B"
+      stroke-width="4"
+      stroke-linecap="round"
+      
+          
+    ></line>
+
+    <!-- tâm kim -->
+    <circle cx="120" cy="120" r="6" fill="#FFEB3B"></circle>
+
+    <!-- nhãn RPM -->
+    <text
+      id="rpmValue"
+      x="120"
+      y="200"
+      text-anchor="middle"
+      fill="#fff"
+      font-size="20"
+      font-weight="bold"
+    >0 rpm</text>
+  </svg>
+</div>
+
+
+              <div style="margin-top: 6px; font-size: 28px; font-weight: 700">
+                <span id="rpmText">0</span>
+                <span style="font-size: 14px; color: #a6b3bd">rpm</span>
+              </div>
+            </div>
+          </div>
+
+          
+          <!-- Status Panel -->
+          <div class="card" style="margin-top: 10px">
+            <h3>Status Panel</h3>
+            <div class="row" style="gap: 16px; flex-wrap: wrap;">
+              <div>
+                <span class="muted">RPM:</span>
+                <span id="statusRPM" style="font-weight: bold; color: var(--accent);">--</span>
+              </div>
+              <div>
+                <span class="muted">State:</span>
+                <span id="statusState" style="font-weight: bold;">--</span>
+              </div>
+              <div>
+                <span class="muted">Can Cut:</span>
+                <span id="statusCanCut" style="font-weight: bold;">--</span>
+              </div>
+              <div>
+                <span class="muted">Reason:</span>
+                <span id="statusReason" style="font-weight: bold;">--</span>
+              </div>
+            </div>
+            <div class="row" style="margin-top: 8px;">
+              <button id="btnRefreshStatus" class="btn">Refresh Status</button>
+            </div>
+          </div>
+
+          <!-- Auto Map -->
+          <div class="card" style="margin-top: 10px">
+            <h3>Auto Map</h3>
+            <div class="table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Lo</th>
+                    <th>Hi</th>
+                    <th>Cut (ms)</th>
+                  </tr>
+                </thead>
+                <tbody id="map"></tbody>
+              </table>
+            </div>
+
+            <div style="display: flex; gap: 8px; margin-top: 8px">
+              <button id="btnAddRow" class="btn accent">Thêm dòng</button>
+              <button id="btnSave" class="btn ok">Lưu</button>
+              <button id="btnSaveApply" class="btn primary">Lưu & Áp dụng</button>
+              <button id="btnLoad" class="btn">Tải</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========== TAB: BACKFIRE ========== -->
+        <section id="panel-backfire" role="tabpanel" data-panel="backfire" hidden>
+  <div class="row">
+    <label><span>Enable</span><input id="bf_enable" type="checkbox" /></label>
+    <label><span>IGN only</span><input id="bf_ign_only" type="checkbox" checked /></label>
+
+    <label>Mode
+      <div style="display:flex; gap:12px; align-items:center">
+        <label><input id="bf_mode_shift"   type="checkbox" checked /> SHIFT</label>
+        <label><input id="bf_mode_overrun" type="checkbox" checked /> OVERRUN</label>
+      </div>
+    </label>
+
+    <label>RPM min <input id="bf_rpm_min" type="number" value="4500" /></label>
+    <label>RPM max <input id="bf_rpm_max" type="number" value="9000" /></label>
+    <label>Warmup (s) <input id="bf_warmup_s" type="number" value="120" /></label>
+
+    <label>Decel threshold (rpm/s)
+      <input id="bf_decel_thresh" type="number" value="3000" />
+    </label>
+    <label>Window after shift (ms)
+      <input id="bf_window_ms" type="number" value="250" />
+    </label>
+
+    <label>Burst count <input id="bf_burst_count" type="number" value="3" /></label>
+    <label>Burst ON (ms) <input id="bf_burst_on" type="number" value="25" /></label>
+    <label>Burst OFF (ms) <input id="bf_burst_off" type="number" value="75" /></label>
+    <label>Refractory (ms) <input id="bf_refractory_ms" type="number" value="1500" /></label>
+  </div>
+
+  <div style="margin-top:8px">
+    <button id="btnSaveBF" class="btn ok">Lưu</button>
+  </div>
+</section>
+
+
+        <!-- ========== TAB: TOOLS & LOGS ========== -->
+        <section id="panel-tools" role="tabpanel" data-panel="tools" hidden>
+          <div class="row">
+            <div class="card">
+              <h3>Test Output</h3>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                <button id="btnTestIgn" class="btn primary">Cắt IGN 50ms</button>
+                <button id="btnTestInj" class="btn primary">Cắt INJ 50ms</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>Test RPM</h3>
+              <div class="row">
+                <label>Enable <input id="tr_en" type="checkbox" /></label>
+                <label>RPM <input id="tr_rpm" type="number" value="5000" /></label>
+                <label>
+                  PPR
+                  <select id="tr_ppr">
+                    <option>0.5</option>
+                    <option selected>1</option>
+                    <option>2</option>
+                  </select>
+                </label>
+              </div>
+
+              <div style="margin-top: 8px">
+                <button id="btnApplyTR" class="btn ok">Apply</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>Calibrate RPM</h3>
+              <div class="row">
+                <label>RPM thực tế <input id="cal_true" type="number" /></label>
+              </div>
+
+              <div style="margin-top: 8px">
+                <button id="btnCalib" class="btn ok">Calibrate</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>Config</h3>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                <button id="btnExport" class="btn">Export JSON</button>
+                <button id="btnExportSecrets" class="btn warning">Export with Secrets</button>
+                <input id="f" class="btn" type="file" accept=".json" />
+                <button id="btnReload" class="btn">Reload</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>OTA Updates</h3>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; flex-direction: column;">
+                <div>
+                  <h4>Firmware Update</h4>
+                  <input type="file" id="firmwareFile" accept=".bin" />
+                  <button id="btnUploadFirmware" class="btn primary">Upload Firmware</button>
+                </div>
+                <div>
+                  <h4>Filesystem Update</h4>
+                  <input type="file" id="fsFile" accept=".bin" />
+                  <button id="btnUploadFS" class="btn primary">Upload FS Image</button>
+                </div>
+                <div>
+                  <h4>Single File Upload</h4>
+                  <input type="file" id="singleFile" />
+                  <button id="btnUploadSingle" class="btn primary">Upload File</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Logs</h3>
+            <pre id="logs" class="muted"></pre>
+            <div>
+              <button id="btnClearLog" class="btn danger">Clear</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========== TAB: LOCK ========== -->
+        <section id="panel-lock" role="tabpanel" data-panel="lock" hidden>
+          <!-- -------- Tabs con cho Lock -------- -->
+          <div class="tabs" style="margin-bottom: 16px;">
+            <button id="lock_tab_status" class="tab-btn active">Vehicle Lock</button>
+            <button id="lock_tab_config" class="tab-btn">Cấu hình</button>
+            <button id="lock_tab_control" class="tab-btn">Điều khiển</button>
+          </div>
+
+          <!-- Tab 1: Vehicle Lock Status -->
+          <div id="lock_status" class="lock-tab-content">
+            <div class="card">
+              <h3>Trạng thái khóa</h3>
+              <div class="row" style="align-items:center">
+                <span class="muted">•</span>
+                <span id="lockStateText" class="muted">Unknown</span>
+                <button id="btnLockRefresh" class="btn" style="margin-left:auto">Refresh</button>
+              </div>
+              
+              <!-- Chỉ 2 dòng read-only theo yêu cầu -->
+              <div class="row" style="margin-top: 16px; gap: 16px;">
+                <div class="card" style="background: var(--muted); padding: 12px; flex: 1;">
+                  <h4 style="margin: 0 0 8px 0; color: var(--text);">Vehicle Lock</h4>
+                  <div style="text-align: center;">
+                    <span id="vehicleLockStatus" class="muted" style="font-size: 18px; font-weight: bold;">Loading...</span>
+                  </div>
+                </div>
+                
+                <div class="card" style="background: var(--muted); padding: 12px; flex: 1;">
+                  <h4 style="margin: 0 0 8px 0; color: var(--text);">Đã đặt mật khẩu?</h4>
+                  <div style="text-align: center;">
+                    <span id="hasPasswordStatus" class="muted" style="font-size: 18px; font-weight: bold;">Loading...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 2: Cấu hình -->
+          <div id="lock_config" class="lock-tab-content" style="display: none;">
+            <div class="card">
+              <h3>Cấu hình Lock</h3>
+              <div class="row">
+                <label><span>Enable Lock khi cấp nguồn</span><input id="lock_enabled" type="checkbox" /></label>
+                <label>Cut on lock
+                  <select id="lock_cut_sel">
+                    <option value="ign">Ignition</option>
+                    <option value="inj">Injector</option>
+                  </select>
+                </label>
+                <label>Short max (ms) <input id="lock_short_ms_max" type="number" value="300" /></label>
+                <label>Long min (ms)  <input id="lock_long_ms_min"  type="number" value="600" /></label>
+                <label>Gap (ms)       <input id="lock_gap_ms"       type="number" value="400" /></label>
+                <label>Timeout (s)    <input id="lock_timeout_s"    type="number" value="30" /></label>
+                <label>Max retries    <input id="lock_max_retries"  type="number" value="5" /></label>
+              </div>
+              <div style="margin-top:8px">
+                <button id="btnLockSaveCfg" class="btn ok">Save Lock</button>
+                <span id="msgLockCfg" class="muted"></span>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>Nút tắt chế độ Lock</h3>
+              <div class="row" style="gap:10px; align-items:center">
+                <button id="btnDisableLock" class="btn warning">Tắt chế độ PASS + Lock (không đổi trạng thái cắt)</button>
+                <span class="muted">→ Dừng pass-mode, NPN vẫn dùng cho Quickshifter</span>
+              </div>
+              <div class="muted">
+                <small>• Khi nhấn: lock_enabled=false, locked=false<br>
+                • Không thay đổi trạng thái cắt hiện tại<br>
+                • Reset state machine, dừng đọc NPN cho pass</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 3: Điều khiển -->
+          <div id="lock_control" class="lock-tab-content" style="display: none;">
+            <div class="card">
+              <h3>Điều khiển Lock</h3>
+              <div class="row" style="gap:10px; align-items:center">
+                <button id="btnLockNow" class="btn danger">Lock Now</button>
+                <span class="muted">→ Cắt theo "Cut on lock"</span>
+              </div>
+              <div class="row" style="gap:10px">
+                <input id="unlock_pass" placeholder="Pass 0/1 (vd: 1001)" maxlength="8" />
+                <button id="btnUnlockPass" class="btn">Unlock (Pass)</button>
+              </div>
+              <hr>
+              <h4>Set / Change Pass</h4>
+              <div class="row" style="gap:10px">
+                <input id="old_pass" placeholder="Current pass (0/1)" maxlength="8" />
+                <input id="new_pass" placeholder="New pass (0/1)" maxlength="8" />
+                <input id="new_pass2" placeholder="Repeat new pass" maxlength="8" />
+              </div>
+              <div class="row">
+                <button id="btnLockSet" class="btn">Set Pass</button>
+                <button id="btnLockChange" class="btn">Change Pass</button>
+                <span id="msgLockPass" class="muted"></span>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>Pass Mode Toggle</h3>
+              <div class="row" style="gap:10px; align-items:center">
+                <span class="muted">Trạng thái hiện tại:</span>
+                <span id="passModeStatus" class="muted">Loading...</span>
+                <button id="btnTogglePassMode" class="btn warning">Toggle Pass Mode</button>
+              </div>
+              <div class="muted">
+                <small>• <strong>ON</strong>: Hệ thống yêu cầu pass để unlock<br>
+                • <strong>OFF</strong>: Hệ thống không yêu cầu pass (không lock)</small>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========== TAB: CONFIG ========== -->
+        <section id="panel-config" role="tabpanel" data-panel="config" hidden>
+          <div class="card">
+            <h3>Cấu hình chung</h3>
+            <div class="row">
+              <label>Mode
+                <select id="config_mode">
+                  <option value="0">Manual</option>
+                  <option value="1">Auto</option>
+                </select>
+              </label>
+              <label>Cut Output
+                <select id="config_cutout">
+                  <option value="0">Ignition</option>
+                  <option value="1">Injector</option>
+                </select>
+              </label>
+              <label>RPM Source
+                <select id="config_rsrc">
+                  <option value="0">Coil</option>
+                  <option value="1">Injector</option>
+                </select>
+              </label>
+              <label>PPR <input id="config_ppr" type="number" step="0.5" min="0.5" max="2" /></label>
+            </div>
+            <div class="row">
+              <label>RPM min <input id="config_rpmmin" type="number" /></label>
+              <label>Manual kill (ms) <input id="config_mkill" type="number" /></label>
+              <label>Debounce (ms) <input id="config_deb" type="number" /></label>
+              <label>Holdoff (ms) <input id="config_hold" type="number" /></label>
+            </div>
+            <div style="margin-top:8px">
+              <button id="btnConfigSave" class="btn ok">Save Config</button>
+              <button id="btnConfigSaveApply" class="btn primary">Save & Apply</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Lock Configuration</h3>
+            <div class="row">
+              <label><span>Enable Lock khi cấp nguồn</span><input id="config_lock_enabled" type="checkbox" /></label>
+              <label>Cut on lock
+                <select id="config_lock_cut_sel">
+                  <option value="ign">Ignition</option>
+                  <option value="inj">Injector</option>
+                </select>
+              </label>
+              <label>Short max (ms) <input id="config_lock_short_ms_max" type="number" value="300" /></label>
+              <label>Long min (ms)  <input id="config_lock_long_ms_min"  type="number" value="600" /></label>
+            </div>
+            <div class="row">
+              <label>Gap (ms)       <input id="config_lock_gap_ms"       type="number" value="400" /></label>
+              <label>Timeout (s)    <input id="config_lock_timeout_s"    type="number" value="30" /></label>
+              <label>Max retries    <input id="config_lock_max_retries"  type="number" value="5" /></label>
+            </div>
+            <div style="margin-top:8px">
+              <button id="btnLockSaveCfg" class="btn ok">Save Lock Config</button>
+              <button id="btnDisableLock" class="btn warning">Disable Lock</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Export/Import</h3>
+            <div class="row" style="gap: 8px;">
+              <button id="btnExport" class="btn">Export Config</button>
+              <button id="btnExportSecrets" class="btn accent">Export with Secrets</button>
+              <input type="file" id="f" accept=".json" style="display: none;" />
+              <button onclick="q('#f').click()" class="btn">Import Config</button>
+            </div>
+          </div>
+        </section>
+
+          <!-- ========== TAB: WI-FI ========== -->
+          <section id="panel-wifi" role="tabpanel" data-panel="wifi" hidden>
+            <div class="card">
+              <h3>Wi-Fi AP Status</h3>
+              <div class="row">
+                <label>SSID: <span id="wifi_ssid" class="muted">Loading...</span></label>
+                <label>Status: <span id="wifi_status" class="muted">Loading...</span></label>
+                <label>Timeout: <span id="wifi_timeout" class="muted">Loading...</span></label>
+              </div>
+              <div class="row">
+                <button id="btnWifiRefresh" class="btn">Refresh Status</button>
+                <button id="btnWifiOff" class="btn danger">Tắt Wi-Fi AP</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>Wi-Fi AP Configuration</h3>
+              <div class="row">
+                <label>SSID <input id="wifi_ssid_input" type="text" placeholder="Auto-generated from MAC" maxlength="31" readonly /></label>
+                <label>Password <input id="wifi_pass_input" type="password" placeholder="12345678" maxlength="63" /></label>
+                <label>Timeout (s) <input id="wifi_timeout_input" type="number" value="120" min="0" max="3600" /></label>
+              </div>
+              <div class="row">
+                <button id="btnWifiSave" class="btn ok">Save & Apply</button>
+                <span id="msgWifiConfig" class="muted"></span>
+              </div>
+              <div class="muted">
+                <small>• SSID: 1-31 ký tự<br>
+                • Password: 8-63 ký tự (để trống = AP mở)<br>
+                • Timeout: 0 = không tự tắt</small>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </main>
+
+    <!-- ===================== SCRIPTS ===================== -->
+    <script>
+      /* ---------- Helpers + Tabs ---------- */
+      const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+      const $  = (s, r=document) => r.querySelector(s);
+
+      // Tab system with hash routing
+      function showTab(name, pushHash=true) {
+        try {
+          const tabs = $$('.tabs .tab');
+          const panels = $$('[role="tabpanel"]');
+          let found = false;
+          
+          tabs.forEach(b => {
+            const active = b.dataset.tab === name;
+            b.setAttribute('aria-selected', active ? 'true' : 'false');
+            if (active) found = true;
+          });
+          
+          panels.forEach(p => {
+            const on = p.dataset.panel === name;
+            p.hidden = !on;
+          });
+          
+          if (found && pushHash) {
+            localStorage.setItem('qs:lastTab', name);
+            const newHash = `#tab=${encodeURIComponent(name)}`;
+            if (location.hash !== newHash) {
+              history.replaceState(null, '', newHash);
+            }
+          }
+          
+          console.log(`Switched to tab: ${name}`);
+        } catch (err) {
+          console.error('[tabs] showTab error:', err);
+        }
+      }
+
+      function initTabs() {
+        try {
+          // Click handler with event delegation
+          $('.tabs')?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.tab');
+            if (!btn) return;
+            showTab(btn.dataset.tab);
+          });
+
+          // Hash routing
+          function routeFromHash() {
+            try {
+              const m = location.hash.match(/tab=([^&]+)/);
+              const target = m ? decodeURIComponent(m[1]) : (localStorage.getItem('qs:lastTab') || 'quickshifter');
+              showTab(target, false);
+            } catch (err) {
+              console.error('[tabs] hash routing error:', err);
+              showTab('quickshifter', false);
+            }
+          }
+          
+          window.addEventListener('hashchange', routeFromHash);
+          routeFromHash();
+          
+          console.log('[tabs] Initialized successfully');
+        } catch (err) {
+          console.error('[tabs] init error:', err);
+        }
+      }
+
+      async function apiGet(p, options = {}) {
+        try {
+          const r = await fetch(p, { cache: "no-store", ...options });
+          return r.ok ? r.json() : null;
+        } catch (err) {
+          console.error('[api] GET error:', err);
+          return null;
+        }
+      }
+      
+      async function apiText(p, options = {}) {
+        try {
+          const r = await fetch(p, { cache: "no-store", ...options });
+          return r.text();
+        } catch (err) {
+          console.error('[api] POST error:', err);
+          return null;
+        }
+      }
+
+      async function hold() {
+        try {
+          await apiText("/api/wifi_hold?on=1", { method: "POST" });
+        } catch (e) {
+          console.error('[hold] error:', e);
+        }
+      }
+
+      // ==== Wi-Fi AP Control ====
+      async function wifiRefreshStatus() {
+        try {
+          const data = await apiGet("/api/wifi/status");
+          if (data) {
+            $("#wifi_ssid")?.textContent = data.ssid || "Unknown";
+            $("#wifi_status")?.textContent = data.running ? "Running" : "Stopped";
+            $("#wifi_timeout")?.textContent = (data.timeout_s || 0) + "s";
+          }
+        } catch (e) {
+          console.error("Wi-Fi status error:", e);
+          // Fallback values
+          $("#wifi_ssid")?.textContent = "Error";
+          $("#wifi_status")?.textContent = "Error";
+          $("#wifi_timeout")?.textContent = "Error";
+        }
+      }
+
+      // Load Wi-Fi config vào form
+      function loadWifiConfig() {
+        try {
+          const data = cfg;
+          if (data) {
+            $("#wifi_ssid_input")?.value = data.ap_ssid || "";
+            $("#wifi_pass_input")?.value = ""; // Không hiển thị password
+            $("#wifi_timeout_input")?.value = data.ap_timeout_s || 120;
+          } else {
+            // Fallback values nếu cfg chưa load
+            $("#wifi_ssid_input")?.value = "";
+            $("#wifi_pass_input")?.value = "";
+            $("#wifi_timeout_input")?.value = 120;
+          }
+        } catch (e) {
+          console.error("Load Wi-Fi config error:", e);
+          // Fallback values
+          $("#wifi_ssid_input")?.value = "";
+          $("#wifi_pass_input")?.value = "";
+          $("#wifi_timeout_input")?.value = 120;
+        }
+      }
+
+      // Cập nhật trạng thái Pass Mode
+      function updatePassModeStatus() {
+        try {
+          const lockEnabled = $("#lock_enabled")?.checked || false;
+          const statusElement = $("#passModeStatus");
+          if (statusElement) {
+            if (lockEnabled) {
+              statusElement.textContent = "ON (Pass required)";
+              statusElement.style.color = "#ff4d4d";
+            } else {
+              statusElement.textContent = "OFF (No pass required)";
+              statusElement.style.color = "#18c37e";
+            }
+          }
+          
+          // Cập nhật thông tin Pass trong tab Vehicle Lock
+          const vehicleLockStatus = $("#vehicleLockStatus");
+          const hasPasswordStatus = $("#hasPasswordStatus");
+          
+          if (vehicleLockStatus) {
+            if (cfg.lock_enabled) {
+              vehicleLockStatus.textContent = "ON";
+              vehicleLockStatus.style.color = "var(--ok)";
+            } else {
+              vehicleLockStatus.textContent = "OFF";
+              vehicleLockStatus.style.color = "var(--danger)";
+            }
+          }
+          
+          if (hasPasswordStatus) {
+            if (cfg.lock_code && cfg.lock_code.length > 0) {
+              hasPasswordStatus.textContent = "YES";
+              hasPasswordStatus.style.color = "var(--ok)";
+            } else {
+              hasPasswordStatus.textContent = "NO";
+              hasPasswordStatus.style.color = "var(--danger)";
+            }
+          }
+        } catch (e) {
+          console.error("Update pass mode status error:", e);
+        }
+      }
+
+      async function wifiOff() {
+        try {
+          if (confirm("Tắt Wi-Fi AP ngay?")) {
+            await apiText("/api/wifi_off", { method: "POST" });
+          }
+        } catch (err) {
+          console.error('[wifiOff] error:', err);
+        }
+      }
+      $("#btnWifiOff")?.addEventListener('click', wifiOff);
+
+      // Wi-Fi AP event listeners
+      q("#btnWifiRefresh")?.addEventListener("click", wifiRefreshStatus);
+      q("#btnWifiSave")?.addEventListener("click", async () => {
+        try {
+          const pass = q("#wifi_pass_input")?.value || "";
+          const timeout = +(q("#wifi_timeout_input")?.value || "120");
+
+          if (pass.length > 0 && (pass.length < 8 || pass.length > 63)) {
+            alert("Password must be 8-63 characters or empty");
+            return;
+          }
+
+          const response = await fetch("/api/wifi/config", {
+            method: "POST",
+            body: JSON.stringify({ pass: pass, timeout_s: timeout })
+          });
+          
+          const data = await response.json();
+          if (data.ok) {
+            alert("Wi-Fi config updated");
+            // Cập nhật timeout trong config
+            if (cfg) cfg.ap_timeout_s = timeout;
+            await save();
+            wifiRefreshStatus();
+          } else {
+            alert("Update failed: " + data.msg);
+          }
+        } catch (e) {
+          console.error("Wi-Fi save error:", e);
+          alert("Update failed: " + e.message);
+        }
+      });
+
+      // Pass Mode Toggle event listener
+      q("#btnTogglePassMode")?.addEventListener("click", async () => {
+        try {
+          const currentStatus = q("#passModeStatus")?.textContent || "Unknown";
+          const cmd = currentStatus.includes("OFF") ? "enable" : "disable";
+          
+          const response = await fetch("/api/lock_cmd", {
+            method: "POST", 
+            body: JSON.stringify({cmd: cmd})
+          });
+          
+          const data = await response.json();
+          if (data.ok) {
+            alert(`Pass mode ${cmd === "enable" ? "enabled" : "disabled"}`);
+            try {
+              lockState(); // Refresh trạng thái
+              updatePassModeStatus(); // Cập nhật trạng thái pass mode
+            } catch (e) {
+              console.log('Status refresh failed:', e);
+            }
+          } else {
+            alert(`Toggle failed: ${data.msg}`);
+          }
+        } catch (e) {
+          console.error("Toggle pass mode error:", e);
+          alert("Toggle failed: " + e.message);
+        }
+      });
+
+      // Status Panel
+      let statusPollingInterval = null;
+      
+      async function refreshStatus() {
+        try {
+          const response = await fetch("/api/status", {cache: "no-store"});
+          const data = await response.json();
+          
+          if ($("#statusRPM")) $("#statusRPM").textContent = data.rpm || "--";
+          if ($("#statusState")) $("#statusState").textContent = data.state || "--";
+          if ($("#statusCanCut")) {
+            $("#statusCanCut").textContent = data.can_cut ? "YES" : "NO";
+            $("#statusCanCut").style.color = data.can_cut ? "var(--ok)" : "var(--danger)";
+          }
+          if ($("#statusReason")) $("#statusReason").textContent = data.reason || "--";
+          
+        } catch (error) {
+          console.error("Status refresh error:", error);
+        }
+      }
+      
+      function startStatusPolling() {
+        if (statusPollingInterval) clearInterval(statusPollingInterval);
+        statusPollingInterval = setInterval(refreshStatus, 1000); // Poll mỗi 1 giây
+        refreshStatus(); // Refresh ngay lập tức
+      }
+      
+      function stopStatusPolling() {
+        if (statusPollingInterval) {
+          clearInterval(statusPollingInterval);
+          statusPollingInterval = null;
+        }
+      }
+      
+      // Event listener cho nút Refresh Status
+      q("#btnRefreshStatus")?.addEventListener("click", refreshStatus);
+      
+      // Theo dõi thay đổi form để set unsaved status
+      function setupFormChangeTracking() {
+        try {
+          const formInputs = document.querySelectorAll('input, select, textarea');
+          formInputs.forEach(input => {
+            input.addEventListener('change', () => setUnsavedStatus(true));
+            input.addEventListener('input', () => setUnsavedStatus(true));
+          });
+        } catch (err) {
+          console.error('[setupFormChangeTracking] error:', err);
+        }
+      }
+      
+      // Gọi setupFormChangeTracking khi load page
+      document.addEventListener('DOMContentLoaded', setupFormChangeTracking);
+      
+      // Bắt đầu polling status khi vào tab Quickshifter
+      q("#t_qs")?.addEventListener("click", startStatusPolling);
+      
+      // Dừng polling khi rời tab Quickshifter
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        if (btn.id !== 't_qs') {
+          btn.addEventListener('click', stopStatusPolling);
+        }
+      });
+      
+      // Initialize tabs when DOM is ready
+      document.addEventListener('DOMContentLoaded', () => {
+        console.log("DOM loaded, initializing tabs...");
+        initializeTabs();
+        
+        // Fallback: if tabs still don't work, try again after a short delay
+        setTimeout(() => {
+          if (!tabs.qs || !tb.qs) {
+            console.log("Retrying tab initialization...");
+            initializeTabs();
+          }
+        }, 100);
+        
+        // Set up event delegation as backup
+        setupEventDelegation();
+      });
+      
+      // Also try to initialize if DOM is already loaded
+      if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        console.log("DOM already ready, initializing tabs immediately...");
+        setTimeout(initializeTabs, 0);
+        setTimeout(setupEventDelegation, 0);
+      }
+      
+      // Additional fallback: try multiple times
+      let initAttempts = 0;
+      const maxInitAttempts = 5;
+      
+      function retryTabInit() {
+        if (initAttempts < maxInitAttempts) {
+          initAttempts++;
+          console.log(`Tab initialization attempt ${initAttempts}/${maxInitAttempts}`);
+          
+          if (!tabs.qs || !tb.qs) {
+            setTimeout(() => {
+              initializeTabs();
+              retryTabInit();
+            }, 200);
+          }
+        } else {
+          console.error("Failed to initialize tabs after multiple attempts");
+          // Last resort: use event delegation
+          setupEventDelegation();
+        }
+      }
+      
+      // Start retry mechanism
+      setTimeout(retryTabInit, 500);
+      
+      // Event delegation as backup method
+      function setupEventDelegation() {
+        console.log("Setting up event delegation for tabs...");
+        
+        // Find the tabs container
+        const tabsContainer = q(".tabs");
+        if (tabsContainer) {
+          console.log("Found tabs container, setting up event delegation");
+          
+          tabsContainer.addEventListener('click', (event) => {
+            const target = event.target;
+            
+            // Check if clicked element is a tab button
+            if (target.classList.contains('tab-btn')) {
+              console.log("Tab button clicked via event delegation:", target.id);
+              
+              // Extract tab ID from button ID
+              const tabId = target.id.replace('t_', '');
+              console.log("Switching to tab:", tabId);
+              
+              // Call setTab function
+              setTab(tabId);
+            }
+          });
+          
+          console.log("✓ Event delegation set up successfully");
+        } else {
+          console.error("Tabs container not found for event delegation");
+        }
+      }
+      
+      // Lock tab switching
+      q("#lock_tab_status")?.addEventListener("click", () => switchLockTab("status"));
+      q("#lock_tab_config")?.addEventListener("click", () => switchLockTab("config"));
+      q("#lock_tab_control")?.addEventListener("click", () => switchLockTab("control"));
+      
+      function switchLockTab(tabName) {
+        try {
+          // Hide all tabs
+          document.querySelectorAll(".lock-tab-content").forEach(tab => {
+            tab.style.display = "none";
+          });
+          
+          // Remove active class from all tab buttons
+          document.querySelectorAll("#panel-lock .tab-btn").forEach(btn => {
+            btn.classList.remove("active");
+          });
+          
+          // Show selected tab
+          const selectedTab = $(`#lock_${tabName}`);
+          if (selectedTab) selectedTab.style.display = "block";
+          
+          // Add active class to selected tab button
+          const selectedBtn = $(`#lock_tab_${tabName}`);
+          if (selectedBtn) selectedBtn.classList.add("active");
+        } catch (err) {
+          console.error('[switchLockTab] error:', err);
+        }
+      }
+      
+      // Initialize Lock tab to show first sub-tab by default
+      document.addEventListener('DOMContentLoaded', () => {
+        if (q("#lock_status")) {
+          q("#lock_status").style.display = "block";
+        }
+      });
+      
+      // Nút "Tắt chế độ PASS + Lock (không đổi trạng thái cắt)" - trong tab Config
+      q("#btnDisableLock")?.addEventListener("click", async () => {
+        try {
+          const response = await fetch("/api/lock_cmd", {method:"POST", body: JSON.stringify({cmd:"disable"})});
+          const data = await response.json();
+          if (data.ok) {
+            alert(data.msg || "Lock disabled (no output change)");
+            try {
+              lockState(); // Refresh trạng thái
+              updatePassModeStatus(); // Cập nhật trạng thái pass mode
+            } catch (e) {
+              console.log('Lock state refresh failed:', e);
+            }
+          } else {
+            alert("Disable failed: " + data.msg);
+          }
+        } catch (e) {
+          console.error("Disable lock error:", e);
+          alert("Disable failed: " + e.message);
+        }
+      });
+
+      // Export với secrets (bao gồm password)
+      q("#btnExportSecrets")?.addEventListener("click", async () => {
+        try {
+          const response = await fetch("/api/json/export?include_secret=1");
+          const data = await response.json();
+          const s = JSON.stringify(data, null, 2);
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(new Blob([s], { type: "application/json" }));
+          a.download = "qs_config_with_secrets.json";
+          a.click();
+        } catch (e) {
+          console.error("Export secrets error:", e);
+          alert("Export failed: " + e.message);
+        }
+      });
+
+      /* ---------- Config load/save ---------- */
+      let cfg = {};
+
+      function renderCfg() {
+        try {
+          $("#mode")?.value = cfg.mode;
+          $("#cutout")?.value = cfg.cut_output;
+          $("#rsrc")?.value = cfg.rpm_source;
+          $("#ppr")?.value = cfg.ppr;
+          $("#rpmmin")?.value = cfg.rpm_min;
+          $("#mkill")?.value = cfg.manual_kill_ms;
+          $("#deb")?.value = cfg.debounce_shift_ms;
+          $("#hold")?.value = cfg.holdoff_ms;
+
+          // --- Backfire ---
+          $("#bf_enable")?.checked = !!cfg.bf_enable;
+          $("#bf_ign_only")?.checked = cfg.bf_ign_only ?? true;
+
+          $("#bf_mode_shift")?.checked = (cfg.bf_mode ?? 3) & 0x01;
+          $("#bf_mode_overrun")?.checked = (cfg.bf_mode ?? 3) & 0x02;
+
+          $("#bf_rpm_min")?.value = cfg.bf_rpm_min ?? 4500;
+          $("#bf_rpm_max")?.value = cfg.bf_rpm_max ?? 9000;
+          $("#bf_warmup_s")?.value = cfg.bf_warmup_s ?? 120;
+
+          $("#bf_decel_thresh")?.value = cfg.bf_decel_thresh ?? 3000;
+          $("#bf_window_ms")?.value = cfg.bf_window_ms ?? 250;
+
+          $("#bf_burst_count")?.value = cfg.bf_burst_count ?? 3;
+          $("#bf_burst_on")?.value = cfg.bf_burst_on ?? 25;
+          $("#bf_burst_off")?.value = cfg.bf_burst_off ?? 75;
+          $("#bf_refractory_ms")?.value = cfg.bf_refractory_ms ?? 1500;
+
+          // --- Lock settings ---
+          $("#lock_enabled")?.checked = cfg.lock_enabled ?? false;
+          $("#lock_cut_sel")?.value = cfg.lock_cut_sel ?? "ign";
+          $("#lock_short_ms_max")?.value = cfg.lock_short_ms_max ?? 300;
+          $("#lock_long_ms_min")?.value = cfg.lock_long_ms_min ?? 600;
+          $("#lock_gap_ms")?.value = cfg.lock_gap_ms ?? 400;
+          $("#lock_timeout_s")?.value = cfg.lock_timeout_s ?? 30;
+          $("#lock_max_retries")?.value = cfg.lock_max_retries ?? 5;
+          
+          // --- Config tab Lock settings ---
+          $("#config_lock_enabled")?.checked = cfg.lock_enabled ?? false;
+          $("#config_lock_cut_sel")?.value = cfg.lock_cut_sel ?? "ign";
+          $("#config_lock_short_ms_max")?.value = cfg.lock_short_ms_max ?? 300;
+          $("#config_lock_long_ms_min")?.value = cfg.lock_long_ms_min ?? 600;
+          $("#config_lock_gap_ms")?.value = cfg.lock_gap_ms ?? 400;
+          $("#config_lock_timeout_s")?.value = cfg.lock_timeout_s ?? 30;
+          $("#config_lock_max_retries")?.value = cfg.lock_max_retries ?? 5;
+
+          // --- Wi-Fi AP settings ---
+          $("#wifi_ssid_input")?.value = cfg.ap_ssid ?? "";
+          $("#wifi_timeout_input")?.value = cfg.ap_timeout_s ?? 120;
+
+          // Cập nhật trạng thái Pass Mode
+          updatePassModeStatus();
+
+          const tb = $("#map");
+          if (tb) {
+            tb.innerHTML = "";
+            (cfg.map || []).forEach((b) => {
+              const tr = document.createElement("tr");
+              tr.innerHTML = `
+                <td><input type="number" value="${b.lo}"></td>
+                <td><input type="number" value="${b.hi}"></td>
+                <td><input type="number" value="${b.t}"></td>`;
+              tb.appendChild(tr);
+            });
+          }
+        } catch (err) {
+          console.error('[renderCfg] error:', err);
+        }
+      }
+
+      function collectCfg() {
+        try {
+          cfg.mode = +($("#mode")?.value || 0);
+          cfg.cut_output = +($("#cutout")?.value || 0);
+          cfg.rpm_source = +($("#rsrc")?.value || 0);
+          cfg.ppr = parseFloat($("#ppr")?.value || 1);
+          cfg.rpm_min = +($("#rpmmin")?.value || 2500);
+          cfg.manual_kill_ms = +($("#mkill")?.value || 70);
+          cfg.debounce_shift_ms = +($("#deb")?.value || 15);
+          cfg.holdoff_ms = +($("#hold")?.value || 200);
+
+        cfg.backfire_enabled = q("#bf_en").checked;
+        cfg.backfire_extra_ms = +q("#bf_ex").value;
+        cfg.backfire_min_rpm = +q("#bf_min").value;
+        // --- Backfire ---
+let mode = 0;
+if (q("#bf_mode_shift").checked)   mode |= 0x01;   // BF_SHIFT
+if (q("#bf_mode_overrun").checked) mode |= 0x02;   // BF_OVERRUN
+
+cfg.bf_enable        = q("#bf_enable").checked ? 1 : 0;
+cfg.bf_ign_only      = q("#bf_ign_only").checked ? 1 : 0;
+cfg.bf_mode          = mode;
+
+cfg.bf_rpm_min       = +q("#bf_rpm_min").value;
+cfg.bf_rpm_max       = +q("#bf_rpm_max").value;
+cfg.bf_warmup_s      = +q("#bf_warmup_s").value;
+
+cfg.bf_decel_thresh  = +q("#bf_decel_thresh").value;
+cfg.bf_window_ms     = +q("#bf_window_ms").value;
+
+cfg.bf_burst_count   = +q("#bf_burst_count").value;
+        cfg.bf_burst_on      = +q("#bf_burst_on").value;
+        cfg.bf_burst_off     = +q("#bf_burst_off").value;
+        cfg.bf_refractory_ms = +q("#bf_refractory_ms").value;
+        q("#btnSaveBF").onclick = save;
+
+        // --- Lock settings ---
+        cfg.lock_enabled = q("#config_lock_enabled")?.checked || q("#lock_enabled")?.checked || false;
+        cfg.lock_cut_sel = q("#config_lock_cut_sel")?.value || q("#lock_cut_sel")?.value || "ign";
+        cfg.lock_short_ms_max = +(q("#config_lock_short_ms_max")?.value || q("#lock_short_ms_max")?.value || "300");
+        cfg.lock_long_ms_min =  +(q("#config_lock_long_ms_min")?.value || q("#lock_long_ms_min")?.value || "600");
+        cfg.lock_gap_ms =       +(q("#config_lock_gap_ms")?.value || q("#lock_gap_ms")?.value || "400");
+        cfg.lock_timeout_s =    +(q("#config_lock_timeout_s")?.value || q("#lock_timeout_s")?.value || "30");
+        cfg.lock_max_retries =  +(q("#config_lock_max_retries")?.value || q("#lock_max_retries")?.value || "5");
+
+        // --- Wi-Fi AP settings ---
+        cfg.ap_ssid = q("#wifi_ssid_input").value;
+        cfg.ap_timeout_s = +q("#wifi_timeout_input").value;
+
+
+        cfg.map = [];
+        document.querySelectorAll("#map tr").forEach((tr) => {
+          const t = tr.querySelectorAll("input");
+          if (t.length >= 3) {
+            cfg.map.push({ 
+              lo: +t[0].value || 0, 
+              hi: +t[1].value || 0, 
+              t: +t[2].value || 0 
+            });
+          }
+        });
+      } catch (err) {
+        console.error('[collectCfg] error:', err);
+      }
+
+      async function load() {
+        try {
+          // Disable nút Load trong khi đang tải
+          const btnLoad = $("#btnLoad");
+          if (!btnLoad) return;
+          
+          const originalText = btnLoad.textContent;
+          btnLoad.disabled = true;
+          btnLoad.textContent = "Đang tải...";
+          
+          const d = await apiGet("/api/get");
+          if (d) {
+            cfg = d;
+            renderCfg();
+            toast(true, "Tải cấu hình thành công!");
+            
+            // Hiển thị trạng thái đã tải
+            btnLoad.textContent = "✓ Đã tải";
+            btnLoad.style.background = "var(--ok)";
+            btnLoad.style.color = "white";
+            
+            // Reset sau 3 giây
+            setTimeout(() => {
+              btnLoad.disabled = false;
+              btnLoad.textContent = originalText;
+              btnLoad.style.background = "";
+              btnLoad.style.color = "";
+            }, 3000);
+          }
+        } catch (error) {
+          console.error('[load] error:', error);
+          toast(false, "Tải cấu hình thất bại: " + error);
+          
+          // Reset nút về trạng thái ban đầu
+          const btnLoad = $("#btnLoad");
+          if (btnLoad) {
+            btnLoad.disabled = false;
+            btnLoad.textContent = "Tải lại";
+          }
+        }
+      }
+      // Toast notification function
+      function toast(ok, msg) {
+        const toastEl = $("#toast");
+        if (toastEl) {
+          toastEl.textContent = msg;
+          toastEl.className = `toast ${ok ? 'ok' : 'fail'}`;
+          toastEl.classList.add('show');
+          setTimeout(() => {
+            toastEl.classList.remove('show');
+          }, 3000);
+        }
+      }
+      
+      // Auto Map Save function
+      function readMapFromUI() {
+        try {
+          const map = [];
+          const rows = $$('#map tr');
+          rows.forEach(row => {
+            const inputs = row.querySelectorAll('input');
+            if (inputs.length >= 3) {
+              map.push({
+                lo: parseInt(inputs[0].value) || 0,
+                hi: parseInt(inputs[1].value) || 0,
+                t: parseInt(inputs[2].value) || 0
+              });
+            }
+          });
+          return map;
+        } catch (err) {
+          console.error('[map] read error:', err);
+          return [];
+        }
+      }
+      
+      // Biến theo dõi thay đổi chưa lưu
+      let hasUnsavedChanges = false;
+      
+      // Function để set trạng thái unsaved
+      function setUnsavedStatus(unsaved) {
+        hasUnsavedChanges = unsaved;
+        updateSaveBadge();
+      }
+      
+      // Function để cập nhật badge Save
+      function updateSaveBadge() {
+        try {
+          const btnSave = $("#btnSave");
+          const btnSaveApply = $("#btnSaveApply");
+          
+          if (hasUnsavedChanges) {
+            if (btnSave) {
+              btnSave.textContent = "Lưu *";
+              btnSave.style.background = "var(--danger)";
+              btnSave.style.color = "white";
+            }
+            
+            if (btnSaveApply) {
+              btnSaveApply.textContent = "Lưu & Áp dụng *";
+              btnSaveApply.style.background = "var(--danger)";
+              btnSaveApply.style.color = "white";
+            }
+          } else {
+            if (btnSave) {
+              btnSave.textContent = "Lưu";
+              btnSave.style.background = "";
+              btnSave.style.color = "";
+            }
+            
+            if (btnSaveApply) {
+              btnSaveApply.textContent = "Lưu & Áp dụng";
+              btnSaveApply.style.background = "";
+              btnSaveApply.style.color = "";
+            }
+          }
+        } catch (err) {
+          console.error('[updateSaveBadge] error:', err);
+        }
+      }
+      
+      async function save() {
+        try {
+          collectCfg();
+          
+          // Disable nút Save trong khi đang lưu
+          const btnSave = $("#btnSave");
+          if (!btnSave) return;
+          
+          const originalText = btnSave.textContent;
+          btnSave.disabled = true;
+          btnSave.textContent = "Đang lưu...";
+          
+          const result = await apiText("/api/set", { 
+            method: "POST", 
+            body: JSON.stringify({
+              config: cfg,
+              applyNow: false
+            }) 
+          });
+          
+          if (result && result.includes("ok")) {
+            toast(true, "Cấu hình đã lưu thành công!");
+            setUnsavedStatus(false);
+            
+            // Hiển thị trạng thái đã lưu
+            btnSave.textContent = "✓ Đã lưu";
+            btnSave.style.background = "var(--ok)";
+            btnSave.style.color = "white";
+            
+            // Reset sau 3 giây
+            setTimeout(() => {
+              btnSave.disabled = false;
+              updateSaveBadge();
+            }, 3000);
+          } else {
+            throw new Error("Server returned error");
+          }
+          
+        } catch (error) {
+          console.error('[save] error:', error);
+          toast(false, "Lưu thất bại: " + error);
+          
+          // Reset nút về trạng thái ban đầu
+          const btnSave = $("#btnSave");
+          if (btnSave) {
+            btnSave.disabled = false;
+            updateSaveBadge();
+          }
+        }
+      }
+      
+      async function saveAndApply() {
+        try {
+          collectCfg();
+          
+          // Disable nút Save & Apply trong khi đang lưu
+          const btnSaveApply = $("#btnSaveApply");
+          if (!btnSaveApply) return;
+          
+          const originalText = btnSaveApply.textContent;
+          btnSaveApply.disabled = true;
+          btnSaveApply.textContent = "Đang lưu & áp dụng...";
+          
+          const result = await apiText("/api/set", { 
+            method: "POST", 
+            body: JSON.stringify({
+              config: cfg,
+              applyNow: true
+            }) 
+          });
+          
+          if (result && result.includes("ok")) {
+            toast(true, "Cấu hình đã lưu và áp dụng thành công!");
+            setUnsavedStatus(false);
+            
+            // Reload để đồng bộ UI
+            await load();
+            
+            // Hiển thị trạng thái đã lưu & áp dụng
+            btnSaveApply.textContent = "✓ Đã lưu & áp dụng";
+            btnSaveApply.style.background = "var(--ok)";
+            btnSaveApply.style.color = "white";
+            
+            // Reset sau 3 giây
+            setTimeout(() => {
+              btnSaveApply.disabled = false;
+              updateSaveBadge();
+            }, 3000);
+          } else {
+            throw new Error("Server returned error");
+          }
+          
+        } catch (error) {
+          console.error('[saveAndApply] error:', error);
+          toast(false, "Lưu & áp dụng thất bại: " + error);
+          
+          // Reset nút về trạng thái ban đầu
+          const btnSaveApply = $("#btnSaveApply");
+          if (btnSaveApply) {
+            btnSaveApply.disabled = false;
+            updateSaveBadge();
+          }
+        }
+      }
+
+      // Auto Map buttons
+      $("#btnAddRow")?.addEventListener('click', () => {
+        try {
+          const tr = document.createElement("tr");
+          tr.innerHTML = '<td><input type="number"></td><td><input type="number"></td><td><input type="number"></td>';
+          $("#map")?.appendChild(tr);
+        } catch (err) {
+          console.error('[map] add row error:', err);
+        }
+      });
+      
+      $("#btnSave")?.addEventListener('click', async () => {
+        try {
+          collectCfg();
+          
+          const result = await apiText("/api/set", { 
+            method: "POST", 
+            body: JSON.stringify({
+              config: cfg,
+              applyNow: false
+            }) 
+          });
+          
+          if (result && result.includes("ok")) {
+            toast(true, "Auto Map saved successfully!");
+            setUnsavedStatus(false);
+          } else {
+            throw new Error("Server returned error");
+          }
+        } catch (error) {
+          console.error('[Auto Map save] error:', error);
+          toast(false, "Save failed: " + error);
+        }
+      });
+      
+      $("#btnSaveApply")?.addEventListener('click', saveAndApply);
+      $("#btnLoad")?.addEventListener('click', load);
+      $("#btnSaveBF")?.addEventListener('click', save);
+      
+      // Config tab buttons
+      $("#btnConfigSave")?.addEventListener('click', save);
+      $("#btnConfigSaveApply")?.addEventListener('click', saveAndApply);
+      $("#btnReload")?.addEventListener('click', load);
+
+      $("#btnExport")?.addEventListener('click', () => {
+        try {
+          const s = JSON.stringify(cfg, null, 2);
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(new Blob([s], { type: "application/json" }));
+          a.download = "qs_config.json";
+          a.click();
+        } catch (err) {
+          console.error('[export] error:', err);
+          toast(false, 'Export failed');
+        }
+      });
+      
+      $("#f")?.addEventListener('change', async (e) => {
+        try {
+          const t = await e.target.files[0].text();
+          const result = await apiText("/api/set", { method: "POST", body: t });
+          toast(true, result || 'Import successful');
+          await load();
+        } catch (err) {
+          console.error('[import] error:', err);
+          console.error('[import] error:', err);
+          toast(false, 'Import failed');
+        }
+      });
+
+      /* ---------- Tools ---------- */
+      $("#btnTestIgn")?.addEventListener('click', () => apiText("/api/testcut?out=ign", { method: "POST" }));
+      $("#btnTestInj")?.addEventListener('click', () => apiText("/api/testcut?out=inj", { method: "POST" }));
+      $("#btnApplyTR")?.addEventListener('click', () => {
+        try {
+          const en = $("#tr_en")?.checked ? 1 : 0;
+          const rpm = $("#tr_rpm")?.value;
+          const ppr = $("#tr_ppr")?.value;
+          return apiText(`/api/testrpm?en=${en}&rpm=${rpm}&ppr=${ppr}`, { method: "POST" });
+        } catch (err) {
+          console.error('[testrpm] error:', err);
+        }
+      });
+      $("#btnCalib")?.addEventListener('click', () => {
+        try {
+          const v = $("#cal_true")?.value;
+          if (!v) return toast(false, "Nhập RPM thực tế");
+          return apiText(`/api/calib?true_rpm=${v}`, { method: "POST" }).then((t) => toast(true, t));
+        } catch (err) {
+          console.error('[calib] error:', err);
+        }
+      });
+
+      /* ---------- Logs ---------- */
+      async function loadLogs() {
+        try {
+          const a = await apiGet("/api/log");
+          if (!a) return;
+          const out = a
+            .map(
+              (x) =>
+                `[${x.t}] rpm=${x.rpm} cut=${x.cut}ms ${x.auto ? "AUTO" : "MAN"} ${
+                  x.bf ? "BF" : ""
+                } out=${x.out} why=${x.why}`
+            )
+            .join("\n");
+          const pre = $("#logs");
+          if (pre) {
+            pre.textContent = out;
+            pre.scrollTop = pre.scrollHeight;
+          }
+        } catch (e) {
+          console.error('[loadLogs] error:', e);
+        }
+      }
+      $("#btnClearLog")?.addEventListener('click', () => apiText("/api/clearlog", { method: "POST" }));
+
+      /* ---------- Live RPM Gauge (8h → 3h, 0→14k) ---------- */
+      let rpmSmooth = 0;
+      const rpmAlpha = 0.35;
+      /*
+      const GA = {
+        CX: 110,
+        CY: 110,
+        R: 90,
+        START: 240, // 8 giờ
+        END: 0, // 3 giờ
+        // 
+        */
+ const GA = {
+  CX: 120,
+  CY: 120,
+  R: 90,
+  START: 150,   // 0 rpm ở vị trí 8 giờ
+  END: 0,      // max rpm ở ~2 giờ
+  SWEEP: 0,     // sẽ tính ở configureGauge
+  LEN: 1,
+  MAX: 14000,
+  RED_FROM: 12000,
+};
+
+/*
+      function longSweep(start, end) {
+        let s = ((end - start) % 360 + 360) % 360;
+        if (s < 180) s += 360;
+        return s;
+      }
+*/
+function longSweep(start, end) {
+  // cwShort = độ quét ngắn theo chiều kim đồng hồ (0..360)
+  const cwShort = ((end - start) % 360 + 360) % 360;
+  // long arc = 360 - cwShort (>=180)
+  return cwShort < 180 ? 360 - cwShort : cwShort;
+}
+
+      function arcPath(cx, cy, r, sd, ed, forceLong = true) {
+        const sr = (sd * Math.PI) / 180;
+        const er = (ed * Math.PI) / 180;
+
+        const x1 = cx + r * Math.cos(sr);
+        const y1 = cy + r * Math.sin(sr);
+        const x2 = cx + r * Math.cos(er);
+        const y2 = cy + r * Math.sin(er);
+
+        const laf = forceLong ? 1 : ((ed - sd + 360) % 360 > 180 ? 1 : 0);
+        const swf = 1;
+
+        return `M ${x1.toFixed(3)} ${y1.toFixed(3)} A ${r} ${r} 0 ${laf} ${swf} ${x2.toFixed(
+          3
+        )} ${y2.toFixed(3)}`;
+      }
+
+      function configureGauge({ start, end, max, redFrom = null }) {
+        try {
+          GA.START = start;
+          GA.END = end;
+          GA.MAX = max;
+          GA.RED_FROM = redFrom;
+          GA.SWEEP = longSweep(GA.START, GA.END);
+
+          const track = $("#trackPath");
+          const arc = $("#rpmArc");
+          if (!track || !arc) return;
+
+          const d = arcPath(GA.CX, GA.CY, GA.R, GA.START, GA.END, true);
+          track.setAttribute("d", d);
+          arc.setAttribute("d", d);
+
+          GA.LEN = arc.getTotalLength ? arc.getTotalLength() : Math.PI * GA.R * (GA.SWEEP / 180);
+
+          // ticks 2k
+          const g = $("#rpmTicks");
+          if (g) {
+            g.innerHTML = "";
+            const step = 2000;
+            for (let v = 0; v <= GA.MAX; v += step) {
+              const t = v / GA.MAX;
+              const a = (GA.START + GA.SWEEP * (v / GA.MAX)) % 360;
+              
+              $("#rpmNeedle")?.setAttribute("transform", `rotate(${a} ${GA.CX} ${GA.CY})`);
+
+              const rad = (a * Math.PI) / 180;
+
+              const x1 = GA.CX + Math.cos(rad) * (GA.R - 14);
+              const y1 = GA.CY + Math.sin(rad) * (GA.R - 14);
+              const x2 = GA.CX + Math.cos(rad) * GA.R;
+              const y2 = GA.CY + Math.sin(rad) * GA.R;
+
+              const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+              line.setAttribute("x1", x1);
+              line.setAttribute("y1", y1);
+              line.setAttribute("x2", x2);
+              line.setAttribute("y2", y2);
+              g.appendChild(line);
+
+              const tx = GA.CX + Math.cos(rad) * (GA.R - 28);
+              const ty = GA.CY + Math.sin(rad) * (GA.R - 28);
+              const txt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+              txt.setAttribute("x", tx);
+              txt.setAttribute("y", ty);
+              txt.setAttribute("fill", "#A6B3BD");
+              txt.setAttribute("font-size", "10");
+              txt.setAttribute("text-anchor", "middle");
+              txt.setAttribute("dominant-baseline", "middle");
+              txt.textContent = v / 1000 + "k";
+              g.appendChild(txt);
+            }
+          }
+        } catch (err) {
+          console.error('[configureGauge] error:', err);
+        }
+      }
+
+/*
+      function setGauge(rpm) {
+        rpmSmooth = rpmSmooth ? rpmSmooth * (1 - rpmAlpha) + rpm * rpmAlpha : rpm;
+        const v = Math.max(0, Math.min(GA.MAX, rpmSmooth));
+
+        const txt = q("#rpmText");
+        if (txt) txt.textContent = Math.round(v);
+
+        const a = (GA.START + GA.SWEEP * (v / GA.MAX)) % 360;
+        const needle = q("#rpmNeedle");
+        if (needle) needle.setAttribute("transform", `translate(${GA.CX},${GA.CY}) rotate(${a})`);
+
+        const arc = q("#rpmArc");
+        if (arc) {
+          const len = GA.LEN * (v / GA.MAX);
+          arc.setAttribute("stroke-dasharray", `${len} ${Math.max(1, GA.LEN - len)}`);
+          arc.setAttribute(
+            "stroke",
+            GA.RED_FROM != null && v >= GA.RED_FROM ? "#FF6B6B" : "#1E88FF"
+          );
+        }
+      }
+*/
+
+function setGauge(rpm) {
+  try {
+    // khôi phục smoothing + clamp để tạo v
+    rpmSmooth = rpmSmooth ? rpmSmooth * (1 - rpmAlpha) + rpm * rpmAlpha : rpm;
+    const v = Math.max(0, Math.min(GA.MAX, rpmSmooth));
+    const t = v / GA.MAX; // 0..1
+
+    // kim: 240° -> 90° theo chiều kim đồng hồ, không đụng GA.START/END
+    // sweepCW(240,90) = 210°
+    const a = (240 + ((90 - 240 + 360) % 360) * t) % 360;
+    $("#rpmNeedle")?.setAttribute("transform", `rotate(${a} ${GA.CX} ${GA.CY})`);
+
+    // cập nhật arc theo t (giữ nguyên track/ticks)
+    const arc = $("#rpmArc");
+    if (arc) {
+      const len = GA.LEN * t;
+      arc.setAttribute("stroke-dasharray", `${len} ${Math.max(1, GA.LEN - len)}`);
+      arc.setAttribute("stroke", GA.RED_FROM != null && v >= GA.RED_FROM ? "#FF6B6B" : "#1E88FF");
+    }
+
+    // cập nhật số RPM hiển thị
+    const txt = $("#rpmText");    if (txt) txt.textContent = Math.round(v);
+    const val = $("#rpmValue");   if (val) val.textContent = `${Math.round(v)} rpm`;
+  } catch (err) {
+    console.error('[setGauge] error:', err);
+  }
+}
+
+
+      async function pollRPM() {
+        try {
+          const r = await fetch("/api/rpm", { cache: "no-store" });
+          if (!r.ok) return;
+          const j = await r.json();
+          if (typeof j.rpm === "number") setGauge(j.rpm);
+        } catch (e) {
+          console.error('[pollRPM] error:', e);
+        }
+      }
+
+      
+      /* ---------- Lock helpers ---------- */
+      const only01 = (s)=> (s||"").replace(/[^01]/g,"").slice(0,8);
+      async function lockState(){
+        try{ 
+          const r = await apiGet("/api/lock_state"); 
+          if(!r) return;
+          $("#lockStateText")?.textContent = r.locked? "LOCKED":"UNLOCKED";
+        }catch(e){
+          console.error('[lockState] error:', e);
+        }
+      }
+      $("#btnLockRefresh")?.addEventListener("click", lockState);
+      $("#btnLockSaveCfg")?.addEventListener("click", async ()=>{
+        try {
+          const body = {
+            lock_enabled: $("#lock_enabled")?.checked || false,
+            lock_cut_sel: $("#lock_cut_sel")?.value || "ign",
+            lock_short_ms_max: +($("#lock_short_ms_max")?.value || 300),
+            lock_long_ms_min:  +($("#lock_long_ms_min")?.value || 600),
+            lock_gap_ms:       +($("#lock_gap_ms")?.value || 400),
+            lock_timeout_s:    +($("#lock_timeout_s")?.value || 30),
+            lock_max_retries:  +($("#lock_max_retries")?.value || 5)
+          };
+          const result = await apiText("/api/set", {method:"POST", body: JSON.stringify(body)});
+          $("#msgLockCfg")?.textContent = result || "OK";
+          setTimeout(()=> $("#msgLockCfg")?.textContent="", 1200);
+        } catch (err) {
+          console.error('[lockSaveCfg] error:', err);
+        }
+      });
+      $("#btnLockNow")?.addEventListener("click", async ()=>{
+        try {
+          await apiText("/api/lock_cmd", {method:"POST", body: JSON.stringify({cmd:"lock"})});
+          lockState();
+        } catch (err) {
+          console.error('[lockNow] error:', err);
+        }
+      });
+      $("#btnUnlockPass")?.addEventListener("click", async ()=>{
+        try {
+          const code = only01($("#unlock_pass")?.value);
+          if (!code){ 
+            $("#msgLockPass")?.textContent="Pass 0/1"; 
+            setTimeout(()=> $("#msgLockPass")?.textContent="", 1200); 
+            return; 
+          }
+          const t = await apiText("/api/lock_cmd", {method:"POST", body: JSON.stringify({cmd:"unlock", pass: code})});
+          $("#msgLockPass")?.textContent = t || "OK";
+          lockState();
+          setTimeout(()=> $("#msgLockPass")?.textContent="", 1200);
+        } catch (err) {
+          console.error('[unlockPass] error:', err);
+        }
+      });
+      $("#btnLockSet")?.addEventListener("click", async ()=>{
+        try {
+          const np = only01($("#new_pass")?.value);
+          if (!np){ 
+            $("#msgLockPass")?.textContent="New pass 0/1"; 
+            setTimeout(()=> $("#msgLockPass")?.textContent="", 1200); 
+            return; 
+          }
+          const t = await apiText("/api/set", {method:"POST", body: JSON.stringify({lock_code: np})});
+          $("#msgLockPass")?.textContent = t || "Set OK";
+          setTimeout(()=> $("#msgLockPass")?.textContent="", 1200);
+        } catch (err) {
+          console.error('[lockSet] error:', err);
+        }
+      });
+      $("#btnLockChange")?.addEventListener("click", async ()=>{
+        try {
+          const op = only01($("#old_pass")?.value);
+          const np1 = only01($("#new_pass")?.value);
+          const np2 = only01($("#new_pass2")?.value);
+          if (!op || !np1 || np1!==np2){ 
+            $("#msgLockPass")?.textContent="Kiểm tra pass"; 
+            setTimeout(()=> $("#msgLockPass")?.textContent="", 1200); 
+            return; 
+          }
+          const t = await apiText("/api/lock_change_pass", {method:"POST", body: JSON.stringify({old: op, neo: np1})});
+          $("#msgLockPass")?.textContent = t || "Đổi OK";
+          setTimeout(()=> $("#msgLockPass")?.textContent="", 1200);
+        } catch (err) {
+          console.error('[lockChange] error:', err);
+        }
+      });
+
+      // ---------- Init ----------
+      (async () => {
+        // Ensure DOM is ready before initializing
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', async () => {
+            await initializeApp();
+          });
+        } else {
+          await initializeApp();
+        }
+      })();
+      
+      async function initializeApp() {
+        try {
+          // Initialize tabs first
+          initTabs();
+          
+          await hold();
+          await load();
+          setInterval(loadLogs, 1000); // logs
+          lockState();
+          loadWifiConfig(); // Load Wi-Fi config
+          
+          // Cập nhật trạng thái Pass Mode
+          updatePassModeStatus();
+          
+          // Initialize Lock tab sub-tabs
+          if ($("#lock_status")) {
+            $("#lock_status").style.display = "block";
+            $("#lock_tab_status").classList.add("active");
+          }
+          
+          console.log("App initialized successfully");
+        } catch (error) {
+          console.error("App initialization error:", error);
+        }
+      }
+
+      // Gauge config + polling
+      function configureGauge({ start, end, max, redFrom = null }) {
+        try {
+          GA.START = start;
+          GA.END = end;
+          GA.MAX = max;
+          GA.RED_FROM = redFrom;
+          GA.SWEEP = longSweep(GA.START, GA.END);
+
+          const track = $("#trackPath");
+          const arc = $("#rpmArc");
+          if (!track || !arc) return;
+
+          const d = arcPath(GA.CX, GA.CY, GA.R, GA.START, GA.END, true);
+          track.setAttribute("d", d);
+          arc.setAttribute("d", d);
+
+          GA.LEN = arc.getTotalLength ? arc.getTotalLength() : Math.PI * GA.R * (GA.SWEEP / 180);
+
+          // ticks 2k
+          const g = $("#rpmTicks");
+          if (g) {
+            g.innerHTML = "";
+            const step = 2000;
+            for (let v = 0; v <= GA.MAX; v += step) {
+              const t = v / GA.MAX;
+              const a = (GA.START + GA.SWEEP * (v / GA.MAX)) % 360;
+              
+              const rad = (a * Math.PI) / 180;
+
+              const x1 = GA.CX + Math.cos(rad) * (GA.R - 14);
+              const y1 = GA.CY + Math.sin(rad) * (GA.R - 14);
+              const x2 = GA.CX + Math.cos(rad) * GA.R;
+              const y2 = GA.CY + Math.sin(rad) * GA.R;
+
+              const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+              line.setAttribute("x1", x1);
+              line.setAttribute("y1", y1);
+              line.setAttribute("x2", x2);
+              line.setAttribute("y2", y2);
+              g.appendChild(line);
+
+              const tx = GA.CX + Math.cos(rad) * (GA.R - 28);
+              const ty = GA.CY + Math.sin(rad) * (GA.R - 28);
+              const txt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+              txt.setAttribute("x", tx);
+              txt.setAttribute("y", ty);
+              txt.setAttribute("fill", "#A6B3BD");
+              txt.setAttribute("font-size", "10");
+              txt.setAttribute("text-anchor", "middle");
+              txt.setAttribute("dominant-baseline", "middle");
+              txt.textContent = v / 1000 + "k";
+              g.appendChild(txt);
+            }
+          }
+        } catch (err) {
+          console.error('[configureGauge] error:', err);
+        }
+      }
+
+      function longSweep(start, end) {
+        // cwShort = độ quét ngắn theo chiều kim đồng hồ (0..360)
+        const cwShort = ((end - start) % 360 + 360) % 360;
+        // long arc = 360 - cwShort (>=180)
+        return cwShort < 180 ? 360 - cwShort : cwShort;
+      }
+
+      function arcPath(cx, cy, r, sd, ed, forceLong = true) {
+        const sr = (sd * Math.PI) / 180;
+        const er = (ed * Math.PI) / 180;
+
+        const x1 = cx + r * Math.cos(sr);
+        const y1 = cy + r * Math.sin(sr);
+        const x2 = cx + r * Math.cos(er);
+        const y2 = cy + r * Math.sin(er);
+
+        const laf = forceLong ? 1 : ((ed - sd + 360) % 360 > 180 ? 1 : 0);
+        const swf = 1;
+
+        return `M ${x1.toFixed(3)} ${y1.toFixed(3)} A ${r} ${r} 0 ${laf} ${swf} ${x2.toFixed(
+          3
+        )} ${y2.toFixed(3)}`;
+      }
+
+      // Initialize gauge and start polling
+      configureGauge({ start: GA.START, end: GA.END, max: 14000, redFrom: 12000 });
+      rpmSmooth = 0;
+      setGauge(0);                 // cho kim về 0 ngay (→ 240°)
+      setInterval(pollRPM, 200);   // rồi mới poll
+
+      // Add missing functions
+      function setUnsavedStatus(unsaved) {
+        try {
+          hasUnsavedChanges = unsaved;
+          updateSaveBadge();
+        } catch (err) {
+          console.error('[setUnsavedStatus] error:', err);
+        }
+      }
+
+      // Add missing event listeners
+      $("#btnRefreshStatus")?.addEventListener("click", refreshStatus);
+      
+      // Add missing event listeners for Lock tab sub-tabs
+      $("#lock_tab_status")?.addEventListener("click", () => switchLockTab("status"));
+      $("#lock_tab_config")?.addEventListener("click", () => switchLockTab("config"));
+      $("#lock_tab_control")?.addEventListener("click", () => switchLockTab("control"));
+      
+      // Add missing event listeners for Wi-Fi
+      $("#btnWifiRefresh")?.addEventListener("click", wifiRefreshStatus);
+      $("#btnWifiSave")?.addEventListener("click", async () => {
+        try {
+          const pass = $("#wifi_pass_input")?.value || "";
+          const timeout = +($("#wifi_timeout_input")?.value || "120");
+
+          if (pass.length > 0 && (pass.length < 8 || pass.length > 63)) {
+            toast(false, "Password must be 8-63 characters or empty");
+            return;
+          }
+
+          const response = await fetch("/api/wifi/config", {
+            method: "POST",
+            body: JSON.stringify({ pass: pass, timeout_s: timeout })
+          });
+          
+          const data = await response.json();
+          if (data.ok) {
+            toast(true, "Wi-Fi config updated");
+            // Cập nhật timeout trong config
+            if (cfg) cfg.ap_timeout_s = timeout;
+            await save();
+            wifiRefreshStatus();
+          } else {
+            toast(false, "Update failed: " + data.msg);
+          }
+        } catch (e) {
+          console.error("Wi-Fi save error:", e);
+          toast(false, "Update failed: " + e.message);
+        }
+      });
+
+      // Add missing event listeners for Pass Mode Toggle
+      $("#btnTogglePassMode")?.addEventListener("click", async () => {
+        try {
+          const currentStatus = $("#passModeStatus")?.textContent || "Unknown";
+          const cmd = currentStatus.includes("OFF") ? "enable" : "disable";
+          
+          const response = await fetch("/api/lock_cmd", {
+            method: "POST", 
+            body: JSON.stringify({cmd: cmd})
+          });
+          
+          const data = await response.json();
+          if (data.ok) {
+            toast(true, `Pass mode ${cmd === "enable" ? "enabled" : "disabled"}`);
+            try {
+              lockState(); // Refresh trạng thái
+              updatePassModeStatus(); // Cập nhật trạng thái pass mode
+            } catch (e) {
+              console.log('Status refresh failed:', e);
+            }
+          } else {
+            toast(false, `Toggle failed: ${data.msg}`);
+          }
+        } catch (e) {
+          console.error("Toggle pass mode error:", e);
+          toast(false, "Toggle failed: " + e.message);
+        }
+      });
+
+      // Add missing event listeners for Disable Lock
+      $("#btnDisableLock")?.addEventListener("click", async () => {
+        try {
+          const response = await fetch("/api/lock_cmd", {method:"POST", body: JSON.stringify({cmd:"disable"})});
+          const data = await response.json();
+          if (data.ok) {
+            toast(true, data.msg || "Lock disabled (no output change)");
+            try {
+              lockState(); // Refresh trạng thái
+              updatePassModeStatus(); // Cập nhật trạng thái pass mode
+            } catch (e) {
+              console.log('Lock state refresh failed:', e);
+            }
+          } else {
+            toast(false, "Disable failed: " + data.msg);
+          }
+        } catch (e) {
+          console.error("Disable lock error:", e);
+          toast(false, "Disable failed: " + e.message);
+        }
+      });
+
+      // Add missing event listeners for Export with Secrets
+      $("#btnExportSecrets")?.addEventListener("click", async () => {
+        try {
+          const response = await fetch("/api/json/export?include_secret=1");
+          const data = await response.json();
+          const s = JSON.stringify(data, null, 2);
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(new Blob([s], { type: "application/json" }));
+          a.download = "qs_config_with_secrets.json";
+          a.click();
+        } catch (e) {
+          console.error("Export secrets error:", e);
+          toast(false, "Export failed: " + e.message);
+        }
+      });
+
+      // Add missing event listeners for Status Panel
+      $("#btnRefreshStatus")?.addEventListener("click", refreshStatus);
+      
+      // Add missing event listeners for Form Change Tracking
+      function setupFormChangeTracking() {
+        try {
+          const formInputs = document.querySelectorAll('input, select, textarea');
+          formInputs.forEach(input => {
+            input.addEventListener('change', () => setUnsavedStatus(true));
+            input.addEventListener('input', () => setUnsavedStatus(true));
+          });
+        } catch (err) {
+          console.error('[setupFormChangeTracking] error:', err);
+        }
+      }
+      
+      // Setup form change tracking
+      setupFormChangeTracking();
+      
+      // Add missing event listeners for Status Polling
+      function startStatusPolling() {
+        try {
+          if (statusPollingInterval) clearInterval(statusPollingInterval);
+          statusPollingInterval = setInterval(refreshStatus, 1000); // Poll mỗi 1 giây
+          refreshStatus(); // Refresh ngay lập tức
+        } catch (err) {
+          console.error('[startStatusPolling] error:', err);
+        }
+      }
+      
+      function stopStatusPolling() {
+        try {
+          if (statusPollingInterval) {
+            clearInterval(statusPollingInterval);
+            statusPollingInterval = null;
+          }
+        } catch (err) {
+          console.error('[stopStatusPolling] error:', err);
+        }
+      }
+      
+      // Add missing event listeners for Tab Status Polling
+      $('.tabs')?.addEventListener('click', (e) => {
+        const target = e.target;
+        if (target.classList.contains('tab')) {
+          const tabId = target.dataset.tab;
+          if (tabId === 'quickshifter') {
+            startStatusPolling();
+          } else {
+            stopStatusPolling();
+          }
+        }
+      });
+
+      // ===== OTA Event Handlers =====
+      $("#btnUploadFirmware")?.addEventListener("click", async () => {
+        try {
+          const fileInput = $("#firmwareFile");
+          if (!fileInput?.files?.[0]) {
+            toast(false, "Please select a firmware file");
+            return;
+          }
+          
+          // Hold Wi-Fi AP
+          await hold();
+          
+          const formData = new FormData();
+          formData.append("update", fileInput.files[0]);
+          
+          const response = await fetch("/api/ota/firmware", {
+            method: "POST",
+            body: formData
+          });
+          
+          const data = await response.json();
+          if (data.ok) {
+            toast(true, data.msg || "Firmware update successful");
+            // Reboot will happen automatically
+          } else {
+            toast(false, "Firmware update failed: " + data.msg);
+          }
+        } catch (e) {
+          console.error("Firmware upload error:", e);
+          toast(false, "Upload failed: " + e.message);
+        }
+      });
+
+      $("#btnUploadFS")?.addEventListener("click", async () => {
+        try {
+          const fileInput = $("#fsFile");
+          if (!fileInput?.files?.[0]) {
+            toast(false, "Please select a filesystem image");
+            return;
+          }
+          
+          // Hold Wi-Fi AP
+          await hold();
+          
+          const formData = new FormData();
+          formData.append("update", fileInput.files[0]);
+          
+          const response = await fetch("/api/ota/fsimage", {
+            method: "POST",
+            body: formData
+          });
+          
+          const data = await response.json();
+          if (data.ok) {
+            toast(true, data.msg || "Filesystem update successful");
+            // Reboot will happen automatically
+          } else {
+            toast(false, "Filesystem update failed: " + data.msg);
+          }
+        } catch (e) {
+          console.error("FS upload error:", e);
+          toast(false, "Upload failed: " + e.message);
+        }
+      });
+
+      $("#btnUploadSingle")?.addEventListener("click", async () => {
+        try {
+          const fileInput = $("#singleFile");
+          if (!fileInput?.files?.[0]) {
+            toast(false, "Please select a file");
+            return;
+          }
+          
+          const formData = new FormData();
+          formData.append("file", fileInput.files[0]);
+          
+          const response = await fetch("/api/upload?path=/index.html", {
+            method: "POST",
+            body: formData
+          });
+          
+          const data = await response.json();
+          if (data.ok) {
+            toast(true, "File uploaded successfully");
+            // Refresh page to see changes
+            setTimeout(() => location.reload(), 1000);
+          } else {
+            toast(false, "Upload failed: " + data.msg);
+          }
+        } catch (e) {
+          console.error("Single file upload error:", e);
+          toast(false, "Upload failed: " + e.message);
+        }
+      });
+
+
+
+    </script>
+  </body>
+</html>

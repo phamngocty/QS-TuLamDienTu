@@ -10,6 +10,7 @@
 #include "pwm_test.h"
 #include "lock_guard.h"  // dùng LOCK từ lock_guard.cpp
 #include "Backfire.h"
+#include "ota_manager.h"
 
 // 1) Tạo instance:
 BackfireController backfire;
@@ -61,27 +62,13 @@ void setup(){
   CTRL::begin();
   WEB::beginPortal();     // AP at boot; tự tắt theo ap_timeout_s
   LOCK::begin();          // bật cơ chế khóa theo config
+  OTA_MGR::begin();       // khởi tạo OTA Manager
 
   
   const auto& c = CFG::get();
 
-BackfireController::Config bf{};
-bf.enabled               = (c.bf_enable != 0);
-bf.ign_only              = (c.bf_ign_only != 0);
-bf.mode                  = (uint8_t)(c.bf_mode & (BackfireController::BF_SHIFT | BackfireController::BF_OVERRUN));
-bf.rpm_min               = c.bf_rpm_min;
-bf.rpm_max               = c.bf_rpm_max;
-bf.warmup_s              = c.bf_warmup_s;
-bf.decel_thresh_rpm_s    = c.bf_decel_thresh;
-bf.window_after_shift_ms = c.bf_window_ms;
-bf.burst_count           = c.bf_burst_count;
-bf.burst_on_ms           = c.bf_burst_on;
-bf.burst_off_ms          = c.bf_burst_off;
-bf.refractory_ms         = c.bf_refractory_ms;
-
-backfire.begin(bf, QS_GetRPM, QS_IsCutBusy, QS_RequestIgnCut, QS_IsIgnMode);
-
-  backfire.markStarted(millis());
+// Backfire OFF mặc định theo yêu cầu
+// TODO: Implement backfire nếu cần thiết
 
 }
 
@@ -116,10 +103,8 @@ void loop(){
 
      uint32_t now = millis();
   // ... code khác
-  backfire.tick(now);
   }
   CUT::tick();
-backfire.tick(millis());
 
 
 
@@ -127,6 +112,6 @@ backfire.tick(millis());
 // GỌI HÀM NÀY Ở CHỖ VỪA NHẢ QUICKSHIFT CUT
 // (ngay sau khi bạn tắt rơ-le QS)
 static inline void onQuickshiftCutReleased_hook(uint32_t now) {
-  backfire.onShiftCutCompleted(now);
+  // TODO: Implement backfire hook nếu cần thiết
 }
 

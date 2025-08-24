@@ -19,6 +19,17 @@ namespace LOCK {
 
   void begin() {
     reset();
+    
+    // Chỉ kích hoạt lock nếu được bật trong config
+    const auto c = CFG::get();
+    if (c.lock_enabled) {
+      locked = true;
+      applyCutWhileLocked();
+      Serial.println("[LOCK] Lock enabled at boot - system LOCKED");
+    } else {
+      locked = false;
+      Serial.println("[LOCK] Lock disabled at boot - system UNLOCKED");
+    }
   }
 
   void reset() {
@@ -67,6 +78,15 @@ namespace LOCK {
       unlocked_pulse = true;
       releaseCut();
       reset();
+      
+      // Đảm bảo thoát pass-mode ngay lập tức
+      // Không đọc NPN cho pass nữa
+      st = Stage::IDLE;
+      seq = "";
+      t_press_start = 0;
+      retries = 0;
+      
+      Serial.println("[LOCK] Admin unlock successful - pass mode disabled, system unlocked");
       return true;
     }
     return false;
@@ -129,8 +149,20 @@ namespace LOCK {
 
   void tick() {
     auto c = cfg();
-    if (!c.lock_enabled || !locked) { 
-      return; // Không đọc NPN khi không cần thiết
+    
+    // EARLY RETURN: nếu lock không được bật, KHÔNG can thiệp gì
+    if (!c.lock_enabled) { 
+      // Khi không enabled, đảm bảo cắt được nhả
+      if (locked) {
+        locked = false;
+        releaseCut();
+      }
+      return; 
+    }
+    
+    // Nếu không locked, không đọc NPN cho pass
+    if (!locked) { 
+      return; 
     }
 
     // Timeout & retry limit
@@ -144,19 +176,20 @@ namespace LOCK {
 
     // Đọc cảm biến nhịp (sử dụng API trong trigger_input)
     // SHIFT_NPN active-low: LOW = đang nhấn, HIGH = không nhấn
+    // SỬ DỤNG rawLevel() để không bị debounce - dành riêng cho Lock
     bool pressed = TRIG::rawLevel(); // true = đang nhấn (LOW)
 
     uint32_t now = millis();
 
     switch (st) {
-             case Stage::IDLE:
-         if (pressed) {
-           st = Stage::PRESSING;
-           t_press_start = now;
-         }
-         break;
+      case Stage::IDLE:
+        if (pressed) {
+          st = Stage::PRESSING;
+          t_press_start = now;
+        }
+        break;
 
-       case Stage::PRESSING:
+      case Stage::PRESSING:
         if (!pressed) {
           // Kết thúc nhấn
           uint32_t duration = now - t_press_start;
@@ -173,11 +206,11 @@ namespace LOCK {
         }
         break;
 
-             case Stage::GAP:
-         if (pressed) {
-           // Tiếp tục input
-           st = Stage::PRESSING;
-           t_press_start = now;
+      case Stage::GAP:
+        if (pressed) {
+          // Tiếp tục input
+          st = Stage::PRESSING;
+          t_press_start = now;
         } else if ((now - t_press_start) >= c.lock_gap_ms) {
           // Hết gap -> kiểm tra sequence
           if (seq.length() > 0) {
@@ -187,6 +220,13 @@ namespace LOCK {
               unlocked_pulse = true;
               releaseCut();
               reset();
+              
+              // Đảm bảo thoát pass-mode ngay lập tức
+              st = Stage::IDLE;
+              seq = "";
+              t_press_start = 0;
+              retries = 0;
+              
               Serial.println("[LOCK] Unlock successful, system unlocked");
             } else {
               retries++;

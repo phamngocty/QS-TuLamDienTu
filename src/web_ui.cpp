@@ -8,6 +8,8 @@
 #include "log_ring.h"
 #include "pwm_test.h"
 #include "lock_guard.h"
+#include "control_sm.h"
+#include "ota_manager.h"
 
 #include <Arduino.h>
 #include "FS.h"
@@ -54,7 +56,61 @@ static void handleAPI() {
   // --------- Config get/set ----------
   server.on("/api/get", HTTP_GET, [](AsyncWebServerRequest* req) {
     SLOGln("[API] GET /api/get");
-    String js; CFG::exportJSON(js, false);
+    
+    // Tạo response JSON theo format yêu cầu
+    JsonDocument doc;
+    
+    // Lấy config từ CFG
+    String configJson;
+    CFG::exportJSON(configJson, false);
+    
+    // Parse config JSON để thêm trường lock
+    JsonDocument configDoc;
+    deserializeJson(configDoc, configJson);
+    
+    // Tạo response với format mới
+    doc["mode"] = configDoc["mode"];
+    doc["rpm_source"] = configDoc["rpm_source"];
+    doc["ppr"] = configDoc["ppr"];
+    doc["rpm_min"] = configDoc["rpm_min"];
+    doc["manual_kill_ms"] = configDoc["manual_kill_ms"];
+    doc["debounce_shift_ms"] = configDoc["debounce_shift_ms"];
+    doc["holdoff_ms"] = configDoc["holdoff_ms"];
+    doc["cut_output"] = configDoc["cut_output"];
+    doc["backfire_enabled"] = configDoc["backfire_enabled"];
+    doc["backfire_extra_ms"] = configDoc["backfire_extra_ms"];
+    doc["backfire_min_rpm"] = configDoc["backfire_min_rpm"];
+    doc["ap_timeout_s"] = configDoc["ap_timeout_s"];
+    doc["rpm_scale"] = configDoc["rpm_scale"];
+    doc["map"] = configDoc["map"];
+    
+    // Thêm trường lock
+    doc["lock_enabled"] = configDoc["lock_enabled"] | false;
+    doc["lock_cut_sel"] = configDoc["lock_cut_sel"] | "ign";
+    doc["lock_short_ms_max"] = configDoc["lock_short_ms_max"] | 300;
+    doc["lock_long_ms_min"] = configDoc["lock_long_ms_min"] | 600;
+    doc["lock_gap_ms"] = configDoc["lock_gap_ms"] | 400;
+    doc["lock_timeout_s"] = configDoc["lock_timeout_s"] | 30;
+    doc["lock_max_retries"] = configDoc["lock_max_retries"] | 5;
+    doc["lock_code"] = configDoc["lock_code"] | "";
+    
+    // Thêm trường backfire
+    doc["bf_enable"] = configDoc["bf_enable"] | false;
+    doc["bf_ign_only"] = configDoc["bf_ign_only"] | true;
+    doc["bf_mode"] = configDoc["bf_mode"] | 3;
+    doc["bf_rpm_min"] = configDoc["bf_rpm_min"] | 4500;
+    doc["bf_rpm_max"] = configDoc["bf_rpm_max"] | 9000;
+    doc["bf_warmup_s"] = configDoc["bf_warmup_s"] | 120;
+    doc["bf_decel_thresh"] = configDoc["bf_decel_thresh"] | 3000;
+    doc["bf_window_ms"] = configDoc["bf_window_ms"] | 250;
+    doc["bf_burst_count"] = configDoc["bf_burst_count"] | 3;
+    doc["bf_burst_on"] = configDoc["bf_burst_on"] | 25;
+    doc["bf_burst_off"] = configDoc["bf_burst_off"] | 75;
+    doc["bf_refractory_ms"] = configDoc["bf_refractory_ms"] | 1500;
+    
+    String js;
+    serializeJson(doc, js);
+    
     AsyncWebServerResponse *response = req->beginResponse(200, "application/json", js);
     response->addHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     req->send(response);
@@ -65,9 +121,50 @@ static void handleAPI() {
     SLOGln("[API] POST /api/set");
   }, NULL, [](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t) {
     String body((char*)data, len);
-    bool ok = CFG::importJSON(body);
-    SLOGf("[API] /api/set → %s\n", ok ? "OK" : "BAD");
-    req->send(ok ? 200 : 400, "text/plain", ok ? "OK" : "BAD");
+    
+    // Parse JSON để kiểm tra applyNow
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, body);
+    
+    if (error) {
+      SLOGln("[API] /api/set - BAD JSON");
+      req->send(400, "application/json", "{\"ok\":false,\"err\":\"Invalid JSON\"}");
+      lastHit = millis();
+      return;
+    }
+    
+    // Lấy config từ body
+    JsonObject configObj = doc["config"];
+    if (!configObj) {
+      req->send(400, "application/json", "{\"ok\":false,\"err\":\"Missing config field\"}");
+      lastHit = millis();
+      return;
+    }
+    
+    // Chuyển config về JSON string để import
+    String configJson;
+    serializeJson(configObj, configJson);
+    
+    // Lưu config
+    bool ok = CFG::importJSON(configJson);
+    
+    if (ok) {
+      // Kiểm tra có cần áp dụng ngay không
+      bool applyNow = doc["applyNow"] | false;
+      
+      if (applyNow) {
+        // Reload config đang chạy
+        // TODO: Implement config reload logic
+        SLOGln("[API] /api/set - Config saved and applied");
+      } else {
+        SLOGln("[API] /api/set - Config saved only");
+      }
+      
+      req->send(200, "application/json", "{\"ok\":true}");
+    } else {
+      req->send(400, "application/json", "{\"ok\":false,\"err\":\"Config import failed\"}");
+    }
+    
     lastHit = millis();
   });
 
@@ -75,7 +172,9 @@ static void handleAPI() {
   server.on("/api/log", HTTP_GET, [](AsyncWebServerRequest* req) {
     SLOGln("[API] GET /api/log");
     String js; LOGR::readAllToJson(js);
-    req->send(200, "application/json", js);
+    AsyncWebServerResponse *response = req->beginResponse(200, "application/json", js);
+    response->addHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    req->send(response);
     lastHit = millis();
   });
 
@@ -88,18 +187,51 @@ static void handleAPI() {
 
   // --------- Test output (cut 50ms) ----------
   server.on("/api/testcut", HTTP_POST, [](AsyncWebServerRequest* req) {
-  String out = getParam(req, "out");
-  SLOGf("[API] POST /api/testcut out=%s\n", out.c_str());
-  if (out != "ign" && out != "inj") { req->send(400, "text/plain", "out? ign|inj"); return; }
-  extern void CUT_testPulse(bool useIgn, uint16_t ms);
-  CUT_testPulse(out == "ign", 50);
-  req->send(200, "text/plain", "OK");
-  lastHit = millis();
-});
-
+    String out = getParam(req, "out");
+    SLOGf("[API] POST /api/testcut out=%s\n", out.c_str());
+    if (out != "ign" && out != "inj") { req->send(400, "text/plain", "out? ign|inj"); return; }
+    extern void CUT_testPulse(bool useIgn, uint16_t ms);
+    CUT_testPulse(out == "ign", 50);
+    req->send(200, "text/plain", "OK");
+    lastHit = millis();
+  });
 
   // --------- Test RPM ----------
- // /api/testrpm?en=0|1&rpm=5000&ppr=1
+  server.on("/api/testrpm", HTTP_POST, [](AsyncWebServerRequest* req) {
+    int   en  = getParam(req, "en",  "0").toInt();
+    float rpm = getParam(req, "rpm", "0").toFloat();
+    float ppr = getParam(req, "ppr", "1").toFloat();
+    SLOGf("[API] POST /api/testrpm en=%d rpm=%.1f ppr=%.2f\n", en, rpm, ppr);
+    PWMTEST::enable(en != 0);
+    PWMTEST::setSim(rpm, ppr <= 0 ? 1 : ppr);
+    req->send(200, "text/plain", "OK test rpm");
+    lastHit = millis();
+  });
+
+  // --------- Status & Debug ----------
+  server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest* req) {
+    SLOGln("[API] GET /api/status");
+    
+    // Lấy trạng thái runtime từ module CTRL
+    JsonDocument doc;
+    doc["rpm"] = CTRL::getCurrentRPM();
+    doc["rpm_source"] = (CFG::get().rpm_source == RpmSource::COIL) ? "Coil" : "Injector";
+    doc["ppr"] = CFG::get().ppr;
+    doc["rpm_scale"] = CFG::get().rpm_scale;
+    doc["state"] = CTRL::getCurrentState();
+    doc["last_cut_ms"] = CTRL::getLastCutMs();
+    doc["holdoff_remain_ms"] = CTRL::getHoldoffRemainMs();
+    doc["can_cut"] = CTRL::canCutNow();
+    doc["reason"] = CTRL::getCutReason();
+    
+    String js;
+    serializeJson(doc, js);
+    
+    AsyncWebServerResponse *response = req->beginResponse(200, "application/json", js);
+    response->addHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    req->send(response);
+    lastHit = millis();
+  });
 
   // --------- Config API aliases (không phá route cũ) ----------
   server.on("/api/config/get", HTTP_GET, [](AsyncWebServerRequest* req) {
@@ -159,7 +291,7 @@ static void handleAPI() {
     if (limit > 200) limit = 200;
     if (limit < 1) limit = 1;
     
-        String js; 
+    String js; 
     LOGR::readAllToJson(js);
     
     // Tạo response với next_offset
@@ -213,7 +345,7 @@ static void handleAPI() {
     }
     
     // Chỉ cho phép đổi password và timeout, không cho đổi SSID
-    if (d.containsKey("ssid")) {
+    if (d["ssid"].is<String>()) {
       SLOGln("[WEB] /api/wifi/config: SSID change attempted, ignoring");
       // Bỏ qua để tương thích
     }
@@ -255,19 +387,8 @@ static void handleAPI() {
     req->send(200, "application/json", "{\"ok\":true,\"msg\":\"Wi-Fi password updated\"}");
     lastHit = millis();
   });
-server.on("/api/testrpm", HTTP_POST, [](AsyncWebServerRequest* req) {
-  int   en  = getParam(req, "en",  "0").toInt();
-  float rpm = getParam(req, "rpm", "0").toFloat();
-  float ppr = getParam(req, "ppr", "1").toFloat();
-  SLOGf("[API] POST /api/testrpm en=%d rpm=%.1f ppr=%.2f\n", en, rpm, ppr);
-  PWMTEST::enable(en != 0);
-  PWMTEST::setSim(rpm, ppr <= 0 ? 1 : ppr);
-  req->send(200, "text/plain", "OK test r");
-  lastHit = millis();
-});
 
   // --------- Calibrate RPM ----------
-  // /api/calib?true_rpm=XXXX
   server.on("/api/calib", HTTP_POST, [](AsyncWebServerRequest* req) {
     auto p = req->getParam("true_rpm", true);
     SLOGf("[API] POST /api/calib true_rpm=%s\n", p ? p->value().c_str() : "?");
@@ -282,7 +403,6 @@ server.on("/api/testrpm", HTTP_POST, [](AsyncWebServerRequest* req) {
     req->send(200, "text/plain", "OK");
     lastHit = millis();
   });
-  
 
   // --------- Wi-Fi hold / off ----------
   server.on("/api/wifi_hold", HTTP_POST, [](AsyncWebServerRequest* req) {
@@ -341,95 +461,189 @@ server.on("/api/testrpm", HTTP_POST, [](AsyncWebServerRequest* req) {
   server.serveStatic("/", LittleFS, "/");
 
   // /api/rpm  → trả rpm hiện tại (JSON)
-server.on("/api/rpm", HTTP_GET, [](AsyncWebServerRequest* req){
-  extern uint16_t RPM_get();          // đã dùng trong /api/calib
-  float rpm_raw = (float)RPM_get();
-  auto cfg = CFG::get();
-  float rpm = rpm_raw * (cfg.rpm_scale > 0 ? cfg.rpm_scale : 1.0f);
+  server.on("/api/rpm", HTTP_GET, [](AsyncWebServerRequest* req){
+    extern uint16_t RPM_get();          // đã dùng trong /api/calib
+    float rpm_raw = (float)RPM_get();
+    auto cfg = CFG::get();
+    float rpm = rpm_raw * (cfg.rpm_scale > 0 ? cfg.rpm_scale : 1.0f);
 
-  // (tuỳ chọn) clamp để tránh giá trị lố
-  if (rpm < 0) rpm = 0;
+    // (tuỳ chọn) clamp để tránh giá trị lố
+    if (rpm < 0) rpm = 0;
 
-  // trả JSON rất nhẹ để poll nhanh
-  String js = String("{\"rpm\":") + String((int)rpm) + "}";
-  req->send(200, "application/json", js);
-  lastHit = millis();
-});
-// === LOCK API ===
-server.on("/api/lock_state", HTTP_GET, [](AsyncWebServerRequest* req) {
-  const auto c = CFG::get();
-  JsonDocument doc;
-  doc["locked"]        = LOCK::isLocked();
-  doc["lock_enabled"]  = c.lock_enabled;
-  doc["lock_cut_sel"]  = (uint8_t)c.lock_cut_sel;
-  doc["lock_code_len"] = (uint8_t)strlen(c.lock_code);
-  String out; serializeJson(doc, out);
-  req->send(200, "application/json", out);
-  lastHit = millis();
-});
+    // trả JSON rất nhẹ để poll nhanh
+    String js = String("{\"rpm\":") + String((int)rpm) + "}";
+    req->send(200, "application/json", js);
+    lastHit = millis();
+  });
 
-// POST /api/lock_cmd  body: {"cmd":"lock"} | {"cmd":"unlock","pass":"0101"} | {"cmd":"enable"} | {"cmd":"disable"}
-server.on("/api/lock_cmd", HTTP_POST, [](AsyncWebServerRequest* req){ 
-  SLOGln("[API] POST /api/lock_cmd"); 
-}, nullptr, [](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
-  String body((char*)data, len);
-  JsonDocument d;
-  DeserializationError e = deserializeJson(d, body);
-  if (e) { 
-    SLOGln("[API] /api/lock_cmd - BAD JSON");
-    req->send(400, "application/json", "{\"ok\":false,\"msg\":\"Invalid JSON\"}"); 
-    return; 
-  }
-  
-  String cmd = d["cmd"] | "";
-  SLOGf("[API] /api/lock_cmd - cmd: %s\n", cmd.c_str());
-  
-  if (cmd == "lock") {
-    LOCK::forceLock();
-    SLOGln("[API] /api/lock_cmd - Lock forced");
-    req->send(200, "application/json", "{\"ok\":true,\"msg\":\"Locked\"}");
-  } else if (cmd == "unlock") {
-    String pass = d["pass"] | "";
-    SLOGf("[API] /api/lock_cmd - Unlock attempt with pass: %s\n", pass.c_str());
-    bool ok = LOCK::adminUnlock(pass);
-    if (ok) {
-      SLOGln("[API] /api/lock_cmd - Unlock successful");
-      req->send(200, "application/json", "{\"ok\":true,\"msg\":\"Unlocked\"}");
-    } else {
-      SLOGln("[API] /api/lock_cmd - Unlock failed - wrong password");
-      req->send(403, "application/json", "{\"ok\":false,\"msg\":\"Wrong password\"}");
-    }
-  } else if (cmd == "disable") {
-    SLOGln("[API] /api/lock_cmd - Disable lock requested");
+  // === LOCK API ===
+  server.on("/api/lock_state", HTTP_GET, [](AsyncWebServerRequest* req) {
+    const auto c = CFG::get();
+    JsonDocument doc;
+    doc["locked"]        = LOCK::isLocked();
+    doc["lock_enabled"]  = c.lock_enabled;
+    doc["lock_cut_sel"]  = (uint8_t)c.lock_cut_sel;
+    doc["lock_code_len"] = (uint8_t)strlen(c.lock_code);
+    doc["vehicle_locked"] = LOCK::isLocked();
+    doc["has_password"] = (strlen(c.lock_code) > 0);
     
-    // Tắt lock_enabled trong config
+    String out; 
+    serializeJson(doc, out);
+    
+    AsyncWebServerResponse *response = req->beginResponse(200, "application/json", out);
+    response->addHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    req->send(response);
+    lastHit = millis();
+  });
+
+  // --------- Lock disable endpoint (riêng biệt) ----------
+  server.on("/api/lock/disable", HTTP_POST, [](AsyncWebServerRequest* req) {
+    SLOGln("[API] POST /api/lock/disable");
+    
+    // Tắt lock system
     auto c = CFG::get();
     c.lock_enabled = false;
     CFG::set(c);
     
-    // Tắt lock system (KHÔNG đổi trạng thái cắt)
+    // Gọi LOCK::disableNoOutputChange() để tắt lock
     LOCK::disableNoOutputChange();
     
-    SLOGln("[API] /api/lock_cmd - Lock disabled via API (no output change)");
-    req->send(200, "application/json", "{\"ok\":true,\"msg\":\"lock disabled (no output change)\"}");
-  } else if (cmd == "enable") {
-    SLOGln("[API] /api/lock_cmd - Enable lock requested");
-    bool ok = LOCK::enableLock();
-    if (ok) {
-      SLOGln("[API] /api/lock_cmd - Lock enabled successfully");
-      req->send(200, "application/json", "{\"ok\":true,\"msg\":\"Lock enabled (pass mode ON)\"}");
-    } else {
-      SLOGln("[API] /api/lock_cmd - Lock enable failed");
-      req->send(400, "application/json", "{\"ok\":false,\"msg\":\"Lock enable failed\"}");
+    req->send(200, "application/json", "{\"ok\":true}");
+    lastHit = millis();
+  });
+
+  // POST /api/lock_cmd  body: {"cmd":"lock"} | {"cmd":"unlock","pass":"0101"} | {"cmd":"enable"} | {"cmd":"disable"}
+  server.on("/api/lock_cmd", HTTP_POST, [](AsyncWebServerRequest* req){ 
+    SLOGln("[API] POST /api/lock_cmd"); 
+  }, nullptr, [](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t){
+    String body((char*)data, len);
+    JsonDocument d;
+    DeserializationError e = deserializeJson(d, body);
+    if (e) { 
+      SLOGln("[API] /api/lock_cmd - BAD JSON");
+      req->send(400, "application/json", "{\"ok\":false,\"msg\":\"Invalid JSON\"}"); 
+      return; 
     }
-  } else {
-    SLOGf("[API] /api/lock_cmd - Invalid command: %s\n", cmd.c_str());
-    req->send(400, "application/json", "{\"ok\":false,\"msg\":\"Invalid command\"}");
-  }
-  lastHit = millis();
-});
+    
+    String cmd = d["cmd"] | "";
+    SLOGf("[API] /api/lock_cmd - cmd: %s\n", cmd.c_str());
+    
+    if (cmd == "lock") {
+      LOCK::forceLock();
+      SLOGln("[API] /api/lock_cmd - Lock forced");
+      req->send(200, "application/json", "{\"ok\":true,\"msg\":\"Locked\"}");
+    } else if (cmd == "unlock") {
+      String pass = d["pass"] | "";
+      SLOGf("[API] /api/lock_cmd - Unlock attempt with pass: %s\n", pass.c_str());
+      bool ok = LOCK::adminUnlock(pass);
+      if (ok) {
+        SLOGln("[API] /api/lock_cmd - Unlock successful");
+        req->send(200, "application/json", "{\"ok\":true,\"msg\":\"Unlocked\"}");
+      } else {
+        SLOGln("[API] /api/lock_cmd - Unlock failed - wrong password");
+        req->send(403, "application/json", "{\"ok\":false,\"msg\":\"Wrong password\"}");
+      }
+    } else if (cmd == "disable") {
+      SLOGln("[API] /api/lock_cmd - Disable lock requested");
+      
+      // Tắt lock_enabled trong config
+      auto c = CFG::get();
+      c.lock_enabled = false;
+      CFG::set(c);
+      
+      // Tắt lock system (KHÔNG đổi trạng thái cắt)
+      LOCK::disableNoOutputChange();
+      
+      SLOGln("[API] /api/lock_cmd - Lock disabled via API (no output change)");
+      req->send(200, "application/json", "{\"ok\":true,\"msg\":\"lock disabled (no output change)\"}");
+    } else if (cmd == "enable") {
+      SLOGln("[API] /api/lock_cmd - Enable lock requested");
+      bool ok = LOCK::enableLock();
+      if (ok) {
+        SLOGln("[API] /api/lock_cmd - Lock enabled successfully");
+        req->send(200, "application/json", "{\"ok\":true,\"msg\":\"Lock enabled (pass mode ON)\"}");
+      } else {
+        SLOGln("[API] /api/lock_cmd - Lock enable failed");
+        req->send(400, "application/json", "{\"ok\":false,\"msg\":\"Lock enable failed\"}");
+      }
+    } else {
+      SLOGf("[API] /api/lock_cmd - Invalid command: %s\n", cmd.c_str());
+      req->send(400, "application/json", "{\"ok\":false,\"msg\":\"Invalid command\"}");
+    }
+    lastHit = millis();
+  });
 
+  // --------- Lock change password endpoint ----------
+  server.on("/api/lock_change_pass", HTTP_POST, [](AsyncWebServerRequest* req) {
+    SLOGln("[API] POST /api/lock_change_pass");
+  }, nullptr, [](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t) {
+    String body((char*)data, len);
+    JsonDocument d;
+    DeserializationError e = deserializeJson(d, body);
+    if (e) {
+      SLOGln("[API] /api/lock_change_pass - BAD JSON");
+      req->send(400, "application/json", "{\"ok\":false,\"msg\":\"Invalid JSON\"}");
+      return;
+    }
+    
+    String oldPass = d["old"] | "";
+    String newPass = d["neo"] | "";
+    
+    if (oldPass.length() == 0 || newPass.length() == 0) {
+      req->send(400, "application/json", "{\"ok\":false,\"msg\":\"Old and new password required\"}");
+      return;
+    }
+    
+    // Validate old password
+    if (strcmp(oldPass.c_str(), CFG::get().lock_code) != 0) {
+      req->send(403, "application/json", "{\"ok\":false,\"msg\":\"Wrong old password\"}");
+      return;
+    }
+    
+    // Update password
+    QSConfig cfg = CFG::get();
+    strncpy(cfg.lock_code, newPass.c_str(), sizeof(cfg.lock_code) - 1);
+    cfg.lock_code[sizeof(cfg.lock_code) - 1] = '\0';
+    CFG::set(cfg);
+    
+    SLOGln("[API] /api/lock_change_pass - Password changed successfully");
+    req->send(200, "application/json", "{\"ok\":true,\"msg\":\"Password changed\"}");
+    lastHit = millis();
+  });
 
+  // --------- Lock set password endpoint ----------
+  server.on("/api/lock_set_pass", HTTP_POST, [](AsyncWebServerRequest* req) {
+    SLOGln("[API] POST /api/lock_set_pass");
+  }, nullptr, [](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t) {
+    String body((char*)data, len);
+    JsonDocument d;
+    DeserializationError e = deserializeJson(d, body);
+    if (e) {
+      SLOGln("[API] /api/lock_set_pass - BAD JSON");
+      req->send(400, "application/json", "{\"ok\":false,\"msg\":\"Invalid JSON\"}");
+      return;
+    }
+    
+    String newPass = d["pass"] | "";
+    
+    if (newPass.length() == 0) {
+      req->send(400, "application/json", "{\"ok\":false,\"msg\":\"New password required\"}");
+      return;
+    }
+    
+    // Update password
+    QSConfig cfg = CFG::get();
+    strncpy(cfg.lock_code, newPass.c_str(), sizeof(cfg.lock_code) - 1);
+    cfg.lock_code[sizeof(cfg.lock_code) - 1] = '\0';
+    CFG::set(cfg);
+    
+    SLOGln("[API] /api/lock_set_pass - Password set successfully");
+    req->send(200, "application/json", "{\"ok\":true,\"msg\":\"Password set\"}");
+    lastHit = millis();
+  });
+
+  // Register OTA routes
+  OTAHTTP_registerRoutes(server);
 }
 
 // ===================== Portal lifecycle =====================

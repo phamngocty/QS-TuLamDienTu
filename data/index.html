@@ -104,6 +104,31 @@
         gap: var(--gap);
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       }
+      
+      /* Progress Bar Styles */
+      .progress-container {
+        margin: 12px 0;
+      }
+      .progress-bar {
+        width: 100%;
+        height: 20px;
+        background-color: var(--muted);
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid #1b242b;
+      }
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--ok), #18c37e);
+        transition: width 0.3s ease;
+        border-radius: 10px;
+      }
+      .progress-text {
+        text-align: center;
+        font-size: 12px;
+        color: var(--sub);
+        margin-top: 4px;
+      }
       label {
         display: flex;
         flex-direction: column;
@@ -177,35 +202,49 @@
       .muted {
         color: var(--sub);
       }
+      
+      span {
+        display: inline-block;
+      }
+      
+      h3 {
+        margin: 0 0 12px 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      
+      button {
+        border: 1px solid #22303a;
+        background: #121a1f;
+        color: var(--text);
+        padding: 8px 12px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.2s ease;
+      }
+      
+      button:hover {
+        background: #1a252a;
+        border-color: #2a3a42;
+      }
+      
+      #wifi {
+        display: none;
+      }
+      .msg {
+        background: #18c37e;
+        color: #fff;
+        padding: 10px;
+        border-radius: 8px;
+        margin: 10px 0;
+        display: none;
+      }
       @media (min-width: 900px) {
         main {
           grid-template-columns: 1fr 1fr;
         }
-      }
-      
-      /* Toast notification */
-      .toast {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        padding: 12px 16px;
-        border-radius: 8px;
-        color: white;
-        font-weight: 500;
-        z-index: 1000;
-        opacity: 0;
-        transform: translateX(100%);
-        transition: all 0.3s ease;
-      }
-      .toast.show {
-        opacity: 1;
-        transform: translateX(0);
-      }
-      .toast.ok {
-        background: var(--ok);
-      }
-      .toast.fail {
-        background: var(--danger);
       }
     </style>
   </head>
@@ -218,9 +257,6 @@
       <div class="sp"></div>
       <button id="btnWifiOff" class="btn-danger">Tắt Wi-Fi</button>
     </header>
-
-    <!-- Toast notification -->
-    <div id="toast" class="toast"></div>
     
     <!-- ======================= BODY ======================= -->
     <main>
@@ -350,8 +386,8 @@
             </div>
           </div>
 
-          
-<!-- Auto Map -->
+
+          <!-- Auto Map -->
           <div class="card" style="margin-top: 10px">
             <h3>Auto Map</h3>
             <div class="table">
@@ -457,36 +493,13 @@
               <h3>Config</h3>
                               <div style="display: flex; gap: 8px; flex-wrap: wrap">
                   <button id="btnExport" class="btn">Export JSON</button>
-                  <button id="btnExportSecrets" class="btn warning">Export with Secrets</button>
                   <input id="f" class="btn" type="file" accept=".json" />
                   <button id="btnReload" class="btn">Reload</button>
-                </div>
             </div>
           </div>
 
           <div class="card">
-            <h3>Logs</h3>
-            <pre id="logs" class="muted"></pre>
-            <div>
-              <button id="btnClearLog" class="btn danger">Clear</button>
-            </div>
-          </div>
-        </section>
-
-        <!-- ========== TAB: LOCK ========== -->
-        <section id="lock" style="display: none">
-          <div class="row">
-            <div class="card">
-              <h3>Vehicle Lock</h3>
-              <div class="row" style="align-items:center">
-                <span class="muted">•</span>
-                <span id="lockStateText" class="muted">Unknown</span>
-                <button id="btnLockRefresh" class="btn" style="margin-left:auto">Refresh</button>
-              </div>
-            </div>
-
-            <div class="card">
-              <h3>Cấu hình</h3>
+              <h3>Lock Configuration</h3>
               <div class="row">
                 <label><span>Enable Lock khi cấp nguồn</span><input id="lock_enabled" type="checkbox" /></label>
                 <label>Cut on lock
@@ -502,60 +515,130 @@
                 <label>Max retries    <input id="lock_max_retries"  type="number" value="5" /></label>
               </div>
               <div style="margin-top:8px">
-                <button id="btnLockSaveCfg" class="btn ok">Save Lock</button>
+                <button id="btnLockSaveCfg" class="btn ok">Save Lock Config</button>
                 <span id="msgLockCfg" class="muted"></span>
               </div>
             </div>
 
             <div class="card">
-              <h3>Điều khiển</h3>
-              <div class="row" style="gap:10px; align-items:center">
-                <button id="btnLockNow" class="btn danger">Lock Now</button>
-                <span class="muted">→ Cắt theo “Cut on lock”</span>
+              <h3>OTA Update</h3>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px">
+                <button id="btnOtaPage" class="btn accent">Mở trang OTA dự phòng</button>
+                <button id="btnOtaState" class="btn">OTA State</button>
               </div>
-              <div class="row" style="gap:10px">
-                <input id="unlock_pass" placeholder="Pass 0/1 (vd: 1001)" maxlength="8" />
-                <button id="btnUnlockPass" class="btn">Unlock (Pass)</button>
+              
+              <div style="margin-bottom: 12px">
+                <h4 style="margin: 8px 0; color: #f3c316">Upload Firmware</h4>
+                <form id="otaFwForm" enctype="multipart/form-data" style="display: flex; gap: 8px; align-items: center">
+                  <input type="file" name="update" accept=".bin" required style="flex: 1">
+                  <button type="submit" class="btn primary">Upload FW</button>
+                </form>
+                <div class="progress-container" style="display: none; margin-top: 8px">
+                  <div class="progress-bar">
+                    <div class="progress-fill" style="width: 0%"></div>
               </div>
-              <hr>
-              <h4>Set / Change Pass</h4>
+                  <div class="progress-text">0% (0 KB / 0 KB) - 0 KB/s</div>
+            </div>
+                <div id="otaFwMsg" class="msg" style="display: none; margin-top: 8px"></div>
+          </div>
+
+              <div style="margin-bottom: 12px">
+                <h4 style="margin: 8px 0; color: #f3c316">Upload FS Image</h4>
+                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+                  <input type="checkbox" id="createBackup" checked>
+                  <span>Create FS backup before flashing</span>
+                </label>
+                <form id="otaFsForm" enctype="multipart/form-data" style="display: flex; gap: 8px; align-items: center">
+                  <input type="file" name="update" accept=".bin" required style="flex: 1">
+                  <button type="submit" class="btn primary">Upload FS</button>
+                </form>
+                <div class="progress-container" style="display: none; margin-top: 8px">
+                  <div class="progress-bar">
+                    <div class="progress-fill" style="width: 0%"></div>
+              </div>
+                  <div class="progress-text">0% (0 KB / 0 KB) - 0 KB/s</div>
+              </div>
+                <div id="otaFsMsg" class="msg" style="display: none; margin-top: 8px"></div>
+              </div>
+              
+              <div style="margin-bottom: 12px">
+                <h4 style="margin: 8px 0; color: #f3c316">Upload Single File</h4>
+                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px">
+                  <input type="text" id="upPath" value="/index.html" placeholder="Path" style="flex: 1">
+                  <input type="file" name="file" id="oneFile" required>
+              </div>
+                <button id="btnUploadFile" class="btn primary">Upload File</button>
+                <div class="progress-container" style="display: none; margin-top: 8px">
+                  <div class="progress-bar">
+                    <div class="progress-fill" style="width: 0%"></div>
+                  </div>
+                  <div class="progress-text">0% (0 KB / 0 KB) - 0 KB/s</div>
+                </div>
+                <div id="otaFileMsg" class="msg" style="display: none; margin-top: 8px"></div>
+            </div>
+
+              <hr style="margin: 16px 0">
+              
+              <div style="margin-bottom: 12px">
+                <h4 style="margin: 8px 0; color: #f3c316">Backup & Restore</h4>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                  <button id="btnCreateBackup" class="btn accent">Create FS Backup Now</button>
+                  <button id="btnRollbackFs" class="btn warning">Rollback FS</button>
+                  <button id="btnRollbackFw" class="btn danger">Rollback Firmware</button>
+              </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Logs</h3>
+            <pre id="logs" class="muted"></pre>
+            <div>
+              <button id="btnClearLog" class="btn danger">Clear</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========== TAB: LOCK ========== -->
+        <section id="lock" style="display: none">
+            <div class="row">
+            <div class="card">
+              <h3>Trạng thái Lock</h3>
+              <div class="row" style="align-items:center">
+                <span class="muted">•</span>
+                <span id="lockStateText" class="muted">Unknown</span>
+                <button id="btnLockRefresh" class="btn" style="margin-left:auto">Refresh</button>
+            </div>
+              <div class="muted">
+                <small>• <strong>LOCKED</strong>: Hệ thống bị khóa, quickshifter không hoạt động<br>
+                • <strong>UNLOCKED</strong>: Hệ thống mở, quickshifter hoạt động bình thường<br>
+                • Để unlock: nhập pass bằng NPN (short=0, long=1) hoặc dùng API</small>
+            </div>
+          </div>
+
+          <div class="card">
+              <h3>Đổi mật khẩu</h3>
               <div class="row" style="gap:10px">
                 <input id="old_pass" placeholder="Current pass (0/1)" maxlength="8" />
                 <input id="new_pass" placeholder="New pass (0/1)" maxlength="8" />
                 <input id="new_pass2" placeholder="Repeat new pass" maxlength="8" />
-              </div>
-              <div class="row">
-                <button id="btnLockSet" class="btn">Set Pass</button>
+            </div>
+            <div class="row">
                 <button id="btnLockChange" class="btn">Change Pass</button>
                 <span id="msgLockPass" class="muted"></span>
-              </div>
             </div>
-
-            <div class="card">
-              <h3>Pass Mode Toggle</h3>
-              <div class="row" style="gap:10px; align-items:center">
-                <span class="muted">Trạng thái hiện tại:</span>
-                <span id="passModeStatus" class="muted">Loading...</span>
-                <button id="btnTogglePassMode" class="btn warning">Toggle Pass Mode</button>
-              </div>
               <div class="muted">
-                <small>• <strong>ON</strong>: Hệ thống yêu cầu pass để unlock<br>
-                • <strong>OFF</strong>: Hệ thống không yêu cầu pass (không lock)</small>
-              </div>
+                <small>• Pass chỉ gồm 0 và 1 (ví dụ: 1001)<br>
+                • Short pulse = 0, Long pulse = 1<br>
+                • Đổi pass chỉ khi đã unlock</small>
             </div>
-
-            <div class="card">
-              <h3>Quick Actions</h3>
-              <div class="row" style="gap:10px; align-items:center">
-                <button id="btnDisableLock" class="btn warning">Tắt chế độ PASS + Lock (không đổi trạng thái cắt)</button>
-                <span class="muted">→ Dừng pass-mode, NPN vẫn dùng cho Quickshifter</span>
-              </div>
             </div>
           </div>
-                  </section>
+        </section>
 
           <!-- ========== TAB: WI-FI ========== -->
-          <section id="wifi" style="display: none;">
+        <section id="wifi" style="display: none">
+          <div class="row">
             <div class="card">
               <h3>Wi-Fi AP Status</h3>
               <div class="row">
@@ -565,7 +648,7 @@
               </div>
               <div class="row">
                 <button id="btnWifiRefresh" class="btn">Refresh Status</button>
-                <button id="btnWifiOff" class="btn danger">Tắt Wi-Fi AP</button>
+                <button id="btnWifiOffTab" class="btn danger">Tắt Wi-Fi AP</button>
               </div>
             </div>
 
@@ -580,10 +663,6 @@
                 <button id="btnWifiSave" class="btn ok">Save & Apply</button>
                 <span id="msgWifiConfig" class="muted"></span>
               </div>
-              <div class="muted">
-                <small>• SSID: 1-31 ký tự<br>
-                • Password: 8-63 ký tự (để trống = AP mở)<br>
-                • Timeout: 0 = không tự tắt</small>
               </div>
             </div>
           </section>
@@ -597,6 +676,32 @@
       const q = (s) => document.querySelector(s);
       const qa = (s) => [...document.querySelectorAll(s)];
 
+      // Toast notification function
+      function toast(success, message) {
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          padding: 12px 16px;
+          border-radius: 8px;
+          color: white;
+          font-weight: 500;
+          z-index: 1000;
+          background: ${success ? 'var(--ok)' : 'var(--danger)'};
+          box-shadow: var(--shadow);
+          transition: all 0.3s ease;
+        `;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateX(100%)';
+          setTimeout(() => document.body.removeChild(toast), 300);
+        }, 3000);
+      }
+
       const tabs = { qs: q("#qs"), bf: q("#bf"), tools: q("#tools"), lock: q("#lock"), wifi: q("#wifi") };
       const tb = { qs: q("#t_qs"), bf: q("#t_bf"), tools: q("#t_tools"), lock: q("#t_lock"), wifi: q("#t_wifi") };
 
@@ -606,354 +711,168 @@
           tb[k].classList.toggle("active", k === id);
         }
       }
-      tb.qs.onclick = () => setTab("qs");
-      tb.bf.onclick = () => setTab("bf");
-      tb.tools.onclick = () => setTab("tools");
-      tb.lock.onclick  = () => setTab("lock");
-      tb.wifi.onclick  = () => setTab("wifi");
+      // Tab event handlers will be set in init function
 
       async function apiGet(p) {
         const r = await fetch(p);
-        return r.ok ? r.json() : null;
+          return r.ok ? r.json() : null;
       }
       async function apiText(p, o) {
         const r = await fetch(p, o);
-        return r.text();
+          return r.text();
       }
 
       async function hold() {
         try {
           await apiText("/api/wifi_hold?on=1", { method: "POST" });
-      // Lock tab hookup
-      q("#t_lock")?.addEventListener("click", ()=> setTab("lock"));
+      // Lock tab hookup - removed duplicate, using onclick above
         } catch (e) {}
       }
-
-      // ==== Wi-Fi AP Control ====
-      async function wifiRefreshStatus() {
-        try {
-          const data = await apiGet("/api/wifi/status");
-          if (data) {
-            q("#wifi_ssid").textContent = data.ssid || "Unknown";
-            q("#wifi_status").textContent = data.running ? "Running" : "Stopped";
-            q("#wifi_timeout").textContent = (data.timeout_s || 0) + "s";
-          }
-        } catch (e) {
-          console.error("Wi-Fi status error:", e);
-          // Fallback values
-          q("#wifi_ssid").textContent = "Error";
-          q("#wifi_status").textContent = "Error";
-          q("#wifi_timeout").textContent = "Error";
-        }
-      }
-
-      // Load Wi-Fi config vào form
-      function loadWifiConfig() {
-        try {
-          const data = cfg;
-          if (data) {
-            q("#wifi_ssid_input").value = data.ap_ssid || "";
-            q("#wifi_pass_input").value = ""; // Không hiển thị password
-            q("#wifi_timeout_input").value = data.ap_timeout_s || 120;
-          } else {
-            // Fallback values nếu cfg chưa load
-            q("#wifi_ssid_input").value = "";
-            q("#wifi_pass_input").value = "";
-            q("#wifi_timeout_input").value = 120;
-          }
-        } catch (e) {
-          console.error("Load Wi-Fi config error:", e);
-          // Fallback values
-          q("#wifi_ssid_input").value = "";
-          q("#wifi_pass_input").value = "";
-          q("#wifi_timeout_input").value = 120;
-        }
-      }
-
-      // Cập nhật trạng thái Pass Mode
-      function updatePassModeStatus() {
-        try {
-          const lockEnabled = q("#lock_enabled")?.checked || false;
-          const statusElement = q("#passModeStatus");
-          if (statusElement) {
-            if (lockEnabled) {
-              statusElement.textContent = "ON (Pass required)";
-              statusElement.style.color = "#ff4d4d";
-            } else {
-              statusElement.textContent = "OFF (No pass required)";
-              statusElement.style.color = "#18c37e";
-            }
-          }
-        } catch (e) {
-          console.error("Update pass mode status error:", e);
-        }
-      }
-
       async function wifiOff() {
-        if (confirm("Tắt Wi-Fi AP ngay?")) {
-          await apiText("/api/wifi_off", { method: "POST" });
-        }
+          if (confirm("Tắt Wi-Fi AP ngay?")) {
+            await apiText("/api/wifi_off", { method: "POST" });
+          }
       }
       q("#btnWifiOff").onclick = wifiOff;
-
-      // Wi-Fi AP event listeners
-      q("#btnWifiRefresh")?.addEventListener("click", wifiRefreshStatus);
-      q("#btnWifiSave")?.addEventListener("click", async () => {
-        try {
-          const pass = q("#wifi_pass_input")?.value || "";
-          const timeout = +(q("#wifi_timeout_input")?.value || "120");
-
-          if (pass.length > 0 && (pass.length < 8 || pass.length > 63)) {
-            alert("Password must be 8-63 characters or empty");
-            return;
-          }
-
-          const response = await fetch("/api/wifi/config", {
-            method: "POST",
-            body: JSON.stringify({ pass: pass, timeout_s: timeout })
-          });
-          
-          const data = await response.json();
-          if (data.ok) {
-            alert("Wi-Fi config updated");
-            // Cập nhật timeout trong config
-            if (cfg) cfg.ap_timeout_s = timeout;
-            await save();
-            wifiRefreshStatus();
-          } else {
-            alert("Update failed: " + data.msg);
-          }
-        } catch (e) {
-          console.error("Wi-Fi save error:", e);
-          alert("Update failed: " + e.message);
-        }
-      });
-
-      // Pass Mode Toggle event listener
-      q("#btnTogglePassMode")?.addEventListener("click", async () => {
-        try {
-          const currentStatus = q("#passModeStatus")?.textContent || "Unknown";
-          const cmd = currentStatus.includes("OFF") ? "enable" : "disable";
-          
-          const response = await fetch("/api/lock_cmd", {
-            method: "POST", 
-            body: JSON.stringify({cmd: cmd})
-          });
-          
-          const data = await response.json();
-          if (data.ok) {
-            alert(`Pass mode ${cmd === "enable" ? "enabled" : "disabled"}`);
-            try {
-              lockState(); // Refresh trạng thái
-              updatePassModeStatus(); // Cập nhật trạng thái pass mode
-            } catch (e) {
-              console.log('Status refresh failed:', e);
-            }
-          } else {
-            alert(`Toggle failed: ${data.msg}`);
-          }
-        } catch (e) {
-          console.error("Toggle pass mode error:", e);
-          alert("Toggle failed: " + e.message);
-        }
-      });
-
-      // Nút "Tắt chế độ PASS + Lock (không đổi trạng thái cắt)"
-      q("#btnDisableLock")?.addEventListener("click", async () => {
-        try {
-          const response = await fetch("/api/lock_cmd", {method:"POST", body: JSON.stringify({cmd:"disable"})});
-          const data = await response.json();
-          if (data.ok) {
-            alert(data.msg || "Lock disabled (no output change)");
-            try {
-              lockState(); // Refresh trạng thái
-              updatePassModeStatus(); // Cập nhật trạng thái pass mode
-            } catch (e) {
-              console.log('Lock state refresh failed:', e);
-            }
-          } else {
-            alert("Disable failed: " + data.msg);
-          }
-        } catch (e) {
-          console.error("Disable lock error:", e);
-          alert("Disable failed: " + e.message);
-        }
-      });
-
-      // Export với secrets (bao gồm password)
-      q("#btnExportSecrets")?.addEventListener("click", async () => {
-        try {
-          const response = await fetch("/api/json/export?include_secret=1");
-          const data = await response.json();
-          const s = JSON.stringify(data, null, 2);
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(new Blob([s], { type: "application/json" }));
-          a.download = "qs_config_with_secrets.json";
-          a.click();
-        } catch (e) {
-          console.error("Export secrets error:", e);
-          alert("Export failed: " + e.message);
-        }
-      });
 
       /* ---------- Config load/save ---------- */
       let cfg = {};
 
       function renderCfg() {
-        q("#mode").value = cfg.mode;
-        q("#cutout").value = cfg.cut_output;
-        q("#rsrc").value = cfg.rpm_source;
-        q("#ppr").value = cfg.ppr;
-        q("#rpmmin").value = cfg.rpm_min;
-        q("#mkill").value = cfg.manual_kill_ms;
-        q("#deb").value = cfg.debounce_shift_ms;
-        q("#hold").value = cfg.holdoff_ms;
+        try {
+          // Core quickshifter config
+          if (q("#mode")) q("#mode").value = cfg.mode;
+          if (q("#cutout")) q("#cutout").value = cfg.cut_output;
+          if (q("#rsrc")) q("#rsrc").value = cfg.rpm_source;
+          if (q("#ppr")) q("#ppr").value = cfg.ppr;
+          if (q("#rpmmin")) q("#rpmmin").value = cfg.rpm_min;
+          if (q("#mkill")) q("#mkill").value = cfg.manual_kill_ms;
+          if (q("#deb")) q("#deb").value = cfg.debounce_shift_ms;
+          if (q("#hold")) q("#hold").value = cfg.holdoff_ms;
 
-        q("#bf_en").checked = cfg.backfire_enabled;
-        q("#bf_ex").value = cfg.backfire_extra_ms;
-        q("#bf_min").value = cfg.backfire_min_rpm;
-        // --- Backfire ---
-q("#bf_enable").checked      = !!cfg.bf_enable;
-q("#bf_ign_only").checked    = cfg.bf_ign_only ?? true;
+          // Backfire config - with safety checks
+          if (q("#bf_enable")) q("#bf_enable").checked = !!cfg.bf_enable;
+          if (q("#bf_ign_only")) q("#bf_ign_only").checked = cfg.bf_ign_only ?? true;
 
-q("#bf_mode_shift").checked   = (cfg.bf_mode ?? 3) & 0x01;
-q("#bf_mode_overrun").checked = (cfg.bf_mode ?? 3) & 0x02;
+          if (q("#bf_mode_shift")) q("#bf_mode_shift").checked = (cfg.bf_mode ?? 3) & 0x01;
+          if (q("#bf_mode_overrun")) q("#bf_mode_overrun").checked = (cfg.bf_mode ?? 3) & 0x02;
 
-q("#bf_rpm_min").value      = cfg.bf_rpm_min ?? 4500;
-q("#bf_rpm_max").value      = cfg.bf_rpm_max ?? 9000;
-q("#bf_warmup_s").value     = cfg.bf_warmup_s ?? 120;
+          if (q("#bf_rpm_min")) q("#bf_rpm_min").value = cfg.bf_rpm_min ?? 4500;
+          if (q("#bf_rpm_max")) q("#bf_rpm_max").value = cfg.bf_rpm_max ?? 9000;
+          if (q("#bf_warmup_s")) q("#bf_warmup_s").value = cfg.bf_warmup_s ?? 120;
 
-q("#bf_decel_thresh").value = cfg.bf_decel_thresh ?? 3000;
-q("#bf_window_ms").value    = cfg.bf_window_ms ?? 250;
+          if (q("#bf_decel_thresh")) q("#bf_decel_thresh").value = cfg.bf_decel_thresh ?? 3000;
+          if (q("#bf_window_ms")) q("#bf_window_ms").value = cfg.bf_window_ms ?? 250;
 
-q("#bf_burst_count").value  = cfg.bf_burst_count ?? 3;
-        q("#bf_burst_on").value     = cfg.bf_burst_on ?? 25;
-        q("#bf_burst_off").value    = cfg.bf_burst_off ?? 75;
-        q("#bf_refractory_ms").value= cfg.bf_refractory_ms ?? 1500;
+          if (q("#bf_burst_count")) q("#bf_burst_count").value = cfg.bf_burst_count ?? 3;
+          if (q("#bf_burst_on")) q("#bf_burst_on").value = cfg.bf_burst_on ?? 25;
+          if (q("#bf_burst_off")) q("#bf_burst_off").value = cfg.bf_burst_off ?? 75;
+          if (q("#bf_refractory_ms")) q("#bf_refractory_ms").value = cfg.bf_refractory_ms ?? 1500;
 
-        // --- Lock settings ---
-        q("#lock_enabled").checked = cfg.lock_enabled ?? false;
-        q("#lock_cut_sel").value = cfg.lock_cut_sel ?? "ign";
-        q("#lock_short_ms_max").value = cfg.lock_short_ms_max ?? 300;
-        q("#lock_long_ms_min").value = cfg.lock_long_ms_min ?? 600;
-                 q("#lock_gap_ms").value = cfg.lock_gap_ms ?? 400;
-        q("#lock_timeout_s").value = cfg.lock_timeout_s ?? 30;
-        q("#lock_max_retries").value = cfg.lock_max_retries ?? 5;
-
-        // --- Wi-Fi AP settings ---
-        q("#wifi_ssid_input").value = cfg.ap_ssid ?? "";
-        q("#wifi_timeout_input").value = cfg.ap_timeout_s ?? 120;
-
-        // Cập nhật trạng thái Pass Mode
-        updatePassModeStatus();
-
-        const tb = q("#map");
-        tb.innerHTML = "";
-        (cfg.map || []).forEach((b) => {
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td><input type="number" value="${b.lo}"></td>
-            <td><input type="number" value="${b.hi}"></td>
-            <td><input type="number" value="${b.t}"></td>`;
-          tb.appendChild(tr);
-        });
+          // Auto Map table - with safety check
+          const tbody = q("#map");
+          if (tbody) {
+            tbody.innerHTML = "";
+            (cfg.map || []).forEach((b) => {
+              const tr = document.createElement("tr");
+              tr.innerHTML = `
+                <td><input type="number" value="${b.lo}"></td>
+                <td><input type="number" value="${b.hi}"></td>
+                <td><input type="number" value="${b.t}"></td>`;
+              tbody.appendChild(tr);
+            });
+          }
+        } catch (e) {
+          console.error("renderCfg error", e);
+          toast(false, "UI render error: " + e.message);
+        }
       }
 
       function collectCfg() {
-        cfg.mode = +q("#mode").value;
-        cfg.cut_output = +q("#cutout").value;
-        cfg.rpm_source = +q("#rsrc").value;
-        cfg.ppr = parseFloat(q("#ppr").value);
-        cfg.rpm_min = +q("#rpmmin").value;
-        cfg.manual_kill_ms = +q("#mkill").value;
-        cfg.debounce_shift_ms = +q("#deb").value;
-        cfg.holdoff_ms = +q("#hold").value;
+        // Core config - with safety checks
+        cfg.mode = q("#mode") ? +q("#mode").value : cfg.mode;
+        cfg.cut_output = q("#cutout") ? +q("#cutout").value : cfg.cut_output;
+        cfg.rpm_source = q("#rsrc") ? +q("#rsrc").value : cfg.rpm_source;
+        cfg.ppr = q("#ppr") ? parseFloat(q("#ppr").value) : cfg.ppr;
+        cfg.rpm_min = q("#rpmmin") ? +q("#rpmmin").value : cfg.rpm_min;
+        cfg.manual_kill_ms = q("#mkill") ? +q("#mkill").value : cfg.manual_kill_ms;
+        cfg.debounce_shift_ms = q("#deb") ? +q("#deb").value : cfg.debounce_shift_ms;
+        cfg.holdoff_ms = q("#hold") ? +q("#hold").value : cfg.holdoff_ms;
 
-        cfg.backfire_enabled = q("#bf_en").checked;
-        cfg.backfire_extra_ms = +q("#bf_ex").value;
-        cfg.backfire_min_rpm = +q("#bf_min").value;
-        // --- Backfire ---
-let mode = 0;
-if (q("#bf_mode_shift").checked)   mode |= 0x01;   // BF_SHIFT
-if (q("#bf_mode_overrun").checked) mode |= 0x02;   // BF_OVERRUN
+        // Backfire config - with safety checks
+        let mode = 0;
+        if (q("#bf_mode_shift")?.checked)   mode |= 0x01;   // BF_SHIFT
+        if (q("#bf_mode_overrun")?.checked) mode |= 0x02;   // BF_OVERRUN
 
-cfg.bf_enable        = q("#bf_enable").checked ? 1 : 0;
-cfg.bf_ign_only      = q("#bf_ign_only").checked ? 1 : 0;
-cfg.bf_mode          = mode;
+        cfg.bf_enable        = q("#bf_enable")?.checked ? 1 : 0;
+        cfg.bf_ign_only      = q("#bf_ign_only")?.checked ? 1 : 0;
+        cfg.bf_mode          = mode;
 
-cfg.bf_rpm_min       = +q("#bf_rpm_min").value;
-cfg.bf_rpm_max       = +q("#bf_rpm_max").value;
-cfg.bf_warmup_s      = +q("#bf_warmup_s").value;
+        cfg.bf_rpm_min       = +(q("#bf_rpm_min")?.value || 4500);
+        cfg.bf_rpm_max       = +(q("#bf_rpm_max")?.value || 9000);
+        cfg.bf_warmup_s      = +(q("#bf_warmup_s")?.value || 120);
 
-cfg.bf_decel_thresh  = +q("#bf_decel_thresh").value;
-cfg.bf_window_ms     = +q("#bf_window_ms").value;
+        cfg.bf_decel_thresh  = +(q("#bf_decel_thresh")?.value || 3000);
+        cfg.bf_window_ms     = +(q("#bf_window_ms")?.value || 250);
 
-cfg.bf_burst_count   = +q("#bf_burst_count").value;
-        cfg.bf_burst_on      = +q("#bf_burst_on").value;
-        cfg.bf_burst_off     = +q("#bf_burst_off").value;
-        cfg.bf_refractory_ms = +q("#bf_refractory_ms").value;
+        cfg.bf_burst_count   = +(q("#bf_burst_count")?.value || 3);
+        cfg.bf_burst_on      = +(q("#bf_burst_on")?.value || 25);
+        cfg.bf_burst_off     = +(q("#bf_burst_off")?.value || 75);
+        cfg.bf_refractory_ms = +(q("#bf_refractory_ms")?.value || 1500);
         q("#btnSaveBF").onclick = save;
 
-        // --- Lock settings ---
-        cfg.lock_enabled = q("#lock_enabled").checked;
-        cfg.lock_cut_sel = q("#lock_cut_sel").value;
-        cfg.lock_short_ms_max = +q("#lock_short_ms_max").value;
-        cfg.lock_long_ms_min =  +q("#lock_long_ms_min").value;
-        cfg.lock_gap_ms =       +q("#lock_gap_ms").value;
-        cfg.lock_timeout_s =    +q("#lock_timeout_s").value;
-        cfg.lock_max_retries =  +q("#lock_max_retries").value;
 
-        // --- Wi-Fi AP settings ---
-        cfg.ap_ssid = q("#wifi_ssid_input").value;
-        cfg.ap_timeout_s = +q("#wifi_timeout_input").value;
-
-
+        // Auto Map collection - with safety check
         cfg.map = [];
-        document.querySelectorAll("#map tr").forEach((tr) => {
+        const rows = document.querySelectorAll("#map tr");
+        rows.forEach((tr) => {
           const t = tr.querySelectorAll("input");
-          cfg.map.push({ lo: +t[0].value, hi: +t[1].value, t: +t[2].value });
+          if (t.length >= 3) {
+            cfg.map.push({ lo: +t[0].value, hi: +t[1].value, t: +t[2].value });
+          }
         });
       }
 
       async function load() {
-        try {
           const d = await apiGet("/api/get");
           if (d) {
             cfg = d;
             renderCfg();
-            alert("Tải cấu hình thành công");
+          
+          // Load lock configuration
+          if (d.lock_enabled !== undefined) {
+            q("#lock_enabled").checked = d.lock_enabled;
           }
-        } catch (error) {
-          alert("Lỗi khi tải cấu hình: " + error);
+          if (d.lock_cut_sel !== undefined) {
+            q("#lock_cut_sel").value = d.lock_cut_sel;
+          }
+          if (d.lock_short_ms_max !== undefined) {
+            q("#lock_short_ms_max").value = d.lock_short_ms_max;
+          }
+          if (d.lock_long_ms_min !== undefined) {
+            q("#lock_long_ms_min").value = d.lock_long_ms_min;
+          }
+          if (d.lock_gap_ms !== undefined) {
+            q("#lock_gap_ms").value = d.lock_gap_ms;
+          }
+          if (d.lock_timeout_s !== undefined) {
+            q("#lock_timeout_s").value = d.lock_timeout_s;
+          }
+          if (d.lock_max_retries !== undefined) {
+            q("#lock_max_retries").value = d.lock_max_retries;
+          }
+          
+          // Load WiFi configuration
+          loadWifiConfig();
         }
       }
-      // Toast notification function
-      function showToast(message, isSuccess = true) {
-        const toast = q("#toast");
-        if (toast) {
-          toast.textContent = message;
-          toast.className = `toast ${isSuccess ? 'ok' : 'fail'}`;
-          toast.classList.add('show');
-          setTimeout(() => {
-            toast.classList.remove('show');
-          }, 3000);
-        }
-      }
-      
       async function save() {
-        collectCfg();
-        try {
-          const result = await apiText("/api/set", { method: "POST", body: JSON.stringify(cfg) });
-          showToast("Auto Map saved successfully", true);
-          // Reload để đồng bộ UI
-          await load();
-        } catch (error) {
-          showToast("Save failed: " + error, false);
-        }
+          collectCfg();
+        alert(await apiText("/api/set", { method: "POST", body: JSON.stringify(cfg) }));
       }
 
       q("#btnAddRow").onclick = () => {
-        const tr = document.createElement("tr");
+          const tr = document.createElement("tr");
         tr.innerHTML =
           '<td><input type="number"></td><td><input type="number"></td><td><input type="number"></td>';
         q("#map").appendChild(tr);
@@ -964,14 +883,14 @@ cfg.bf_burst_count   = +q("#bf_burst_count").value;
       q("#btnReload").onclick = load;
 
       q("#btnExport").onclick = () => {
-        const s = JSON.stringify(cfg, null, 2);
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(new Blob([s], { type: "application/json" }));
-        a.download = "qs_config.json";
-        a.click();
+          const s = JSON.stringify(cfg, null, 2);
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(new Blob([s], { type: "application/json" }));
+          a.download = "qs_config.json";
+          a.click();
       };
       q("#f").onchange = async (e) => {
-        const t = await e.target.files[0].text();
+          const t = await e.target.files[0].text();
         alert(await apiText("/api/set", { method: "POST", body: t }));
         load();
       };
@@ -983,7 +902,7 @@ cfg.bf_burst_count   = +q("#bf_burst_count").value;
         const en = q("#tr_en").checked ? 1 : 0;
         const rpm = q("#tr_rpm").value;
         const ppr = q("#tr_ppr").value;
-        return apiText(`/api/testrpm?en=${en}&rpm=${rpm}&ppr=${ppr}`, { method: "POST" });
+          return apiText(`/api/testrpm?en=${en}&rpm=${rpm}&ppr=${ppr}`, { method: "POST" });
       };
       q("#btnCalib").onclick = () => {
         const v = q("#cal_true").value;
@@ -1005,24 +924,32 @@ cfg.bf_burst_count   = +q("#bf_burst_count").value;
             )
             .join("\n");
           const pre = q("#logs");
-          pre.textContent = out;
-          pre.scrollTop = pre.scrollHeight;
+            pre.textContent = out;
+            pre.scrollTop = pre.scrollHeight;
         } catch (e) {}
       }
       q("#btnClearLog").onclick = () => apiText("/api/clearlog", { method: "POST" });
 
+      /* ---------- OTA Update ---------- */
+      function showOtaMsg(id, text, isError) {
+        const msg = document.getElementById(id);
+        msg.textContent = text;
+        msg.style.background = isError ? '#ff4d4d' : '#18c37e';
+        msg.style.display = 'block';
+        setTimeout(() => msg.style.display = 'none', 5000);
+      }
+
+      // Mở trang OTA dự phòng
+      q("#btnOtaPage").onclick = () => {
+        location.href = '/ota';
+      };
+
+      // Form handlers removed - using addEventListener below
+
       /* ---------- Live RPM Gauge (8h → 3h, 0→14k) ---------- */
       let rpmSmooth = 0;
       const rpmAlpha = 0.35;
-      /*
-      const GA = {
-        CX: 110,
-        CY: 110,
-        R: 90,
-        START: 240, // 8 giờ
-        END: 0, // 3 giờ
-        // 
-        */
+      // Gauge configuration removed - using active one below
  const GA = {
   CX: 120,
   CY: 120,
@@ -1035,13 +962,7 @@ cfg.bf_burst_count   = +q("#bf_burst_count").value;
   RED_FROM: 12000,
 };
 
-/*
-      function longSweep(start, end) {
-        let s = ((end - start) % 360 + 360) % 360;
-        if (s < 180) s += 360;
-        return s;
-      }
-*/
+// Function moved below
 function longSweep(start, end) {
   // cwShort = độ quét ngắn theo chiều kim đồng hồ (0..360)
   const cwShort = ((end - start) % 360 + 360) % 360;
@@ -1067,61 +988,61 @@ function longSweep(start, end) {
       }
 
       function configureGauge({ start, end, max, redFrom = null }) {
-        GA.START = start;
-        GA.END = end;
-        GA.MAX = max;
-        GA.RED_FROM = redFrom;
-        GA.SWEEP = longSweep(GA.START, GA.END);
+          GA.START = start;
+          GA.END = end;
+          GA.MAX = max;
+          GA.RED_FROM = redFrom;
+          GA.SWEEP = longSweep(GA.START, GA.END);
 
         const track = q("#trackPath");
         const arc = q("#rpmArc");
-        if (!track || !arc) return;
+          if (!track || !arc) return;
 
-        const d = arcPath(GA.CX, GA.CY, GA.R, GA.START, GA.END, true);
-        track.setAttribute("d", d);
-        arc.setAttribute("d", d);
+          const d = arcPath(GA.CX, GA.CY, GA.R, GA.START, GA.END, true);
+          track.setAttribute("d", d);
+          arc.setAttribute("d", d);
 
-        GA.LEN = arc.getTotalLength ? arc.getTotalLength() : Math.PI * GA.R * (GA.SWEEP / 180);
+          GA.LEN = arc.getTotalLength ? arc.getTotalLength() : Math.PI * GA.R * (GA.SWEEP / 180);
 
-        // ticks 2k
+          // ticks 2k
         const g = q("#rpmTicks");
-        if (g) {
-          g.innerHTML = "";
-          const step = 2000;
-          for (let v = 0; v <= GA.MAX; v += step) {
-            const t = v / GA.MAX;
+          if (g) {
+            g.innerHTML = "";
+            const step = 2000;
+            for (let v = 0; v <= GA.MAX; v += step) {
+              const t = v / GA.MAX;
            // const a = (GA.START + GA.SWEEP * t) % 360;
-            const a = (GA.START + GA.SWEEP * (v / GA.MAX)) % 360;
-            
+              const a = (GA.START + GA.SWEEP * (v / GA.MAX)) % 360;
+              
             
   q("#rpmNeedle").setAttribute("transform", `rotate(${a} ${GA.CX} ${GA.CY})`);
 
 
-            const rad = (a * Math.PI) / 180;
+              const rad = (a * Math.PI) / 180;
 
-            const x1 = GA.CX + Math.cos(rad) * (GA.R - 14);
-            const y1 = GA.CY + Math.sin(rad) * (GA.R - 14);
-            const x2 = GA.CX + Math.cos(rad) * GA.R;
-            const y2 = GA.CY + Math.sin(rad) * GA.R;
+              const x1 = GA.CX + Math.cos(rad) * (GA.R - 14);
+              const y1 = GA.CY + Math.sin(rad) * (GA.R - 14);
+              const x2 = GA.CX + Math.cos(rad) * GA.R;
+              const y2 = GA.CY + Math.sin(rad) * GA.R;
 
-            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-            line.setAttribute("x1", x1);
-            line.setAttribute("y1", y1);
-            line.setAttribute("x2", x2);
-            line.setAttribute("y2", y2);
-            g.appendChild(line);
+              const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+              line.setAttribute("x1", x1);
+              line.setAttribute("y1", y1);
+              line.setAttribute("x2", x2);
+              line.setAttribute("y2", y2);
+              g.appendChild(line);
 
-            const tx = GA.CX + Math.cos(rad) * (GA.R - 28);
-            const ty = GA.CY + Math.sin(rad) * (GA.R - 28);
-            const txt = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            txt.setAttribute("x", tx);
-            txt.setAttribute("y", ty);
-            txt.setAttribute("fill", "#A6B3BD");
-            txt.setAttribute("font-size", "10");
-            txt.setAttribute("text-anchor", "middle");
-            txt.setAttribute("dominant-baseline", "middle");
-            txt.textContent = v / 1000 + "k";
-            g.appendChild(txt);
+              const tx = GA.CX + Math.cos(rad) * (GA.R - 28);
+              const ty = GA.CY + Math.sin(rad) * (GA.R - 28);
+              const txt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+              txt.setAttribute("x", tx);
+              txt.setAttribute("y", ty);
+              txt.setAttribute("fill", "#A6B3BD");
+              txt.setAttribute("font-size", "10");
+              txt.setAttribute("text-anchor", "middle");
+              txt.setAttribute("dominant-baseline", "middle");
+              txt.textContent = v / 1000 + "k";
+              g.appendChild(txt);
           }
         }
 
@@ -1139,53 +1060,31 @@ if (redFrom != null && redFrom < GA.MAX) {
 }*/
       }
 
-/*
+// Function implementation cleaned up above
+
       function setGauge(rpm) {
+        // khôi phục smoothing + clamp để tạo v
         rpmSmooth = rpmSmooth ? rpmSmooth * (1 - rpmAlpha) + rpm * rpmAlpha : rpm;
         const v = Math.max(0, Math.min(GA.MAX, rpmSmooth));
+        const t = v / GA.MAX; // 0..1
 
-        const txt = q("#rpmText");
-        if (txt) txt.textContent = Math.round(v);
+        // kim: 240° -> 90° theo chiều kim đồng hồ, không đụng GA.START/END
+        // sweepCW(240,90) = 210°
+        const a = (240 + ((90 - 240 + 360) % 360) * t) % 360;
+        q("#rpmNeedle").setAttribute("transform", `rotate(${a} ${GA.CX} ${GA.CY})`);
 
-        const a = (GA.START + GA.SWEEP * (v / GA.MAX)) % 360;
-        const needle = q("#rpmNeedle");
-        if (needle) needle.setAttribute("transform", `translate(${GA.CX},${GA.CY}) rotate(${a})`);
-
+        // cập nhật arc theo t (giữ nguyên track/ticks)
         const arc = q("#rpmArc");
         if (arc) {
-          const len = GA.LEN * (v / GA.MAX);
+          const len = GA.LEN * t;
           arc.setAttribute("stroke-dasharray", `${len} ${Math.max(1, GA.LEN - len)}`);
-          arc.setAttribute(
-            "stroke",
-            GA.RED_FROM != null && v >= GA.RED_FROM ? "#FF6B6B" : "#1E88FF"
-          );
+          arc.setAttribute("stroke", GA.RED_FROM != null && v >= GA.RED_FROM ? "#FF6B6B" : "#1E88FF");
         }
+
+        // cập nhật số RPM hiển thị
+        const txt = q("#rpmText");    if (txt) txt.textContent = Math.round(v);
+        const val = q("#rpmValue");   if (val) val.textContent = `${Math.round(v)} rpm`;
       }
-*/
-
-function setGauge(rpm) {
-  // khôi phục smoothing + clamp để tạo v
-  rpmSmooth = rpmSmooth ? rpmSmooth * (1 - rpmAlpha) + rpm * rpmAlpha : rpm;
-  const v = Math.max(0, Math.min(GA.MAX, rpmSmooth));
-  const t = v / GA.MAX; // 0..1
-
-  // kim: 240° -> 90° theo chiều kim đồng hồ, không đụng GA.START/END
-  // sweepCW(240,90) = 210°
-  const a = (240 + ((90 - 240 + 360) % 360) * t) % 360;
-  q("#rpmNeedle").setAttribute("transform", `rotate(${a} ${GA.CX} ${GA.CY})`);
-
-  // cập nhật arc theo t (giữ nguyên track/ticks)
-  const arc = q("#rpmArc");
-  if (arc) {
-    const len = GA.LEN * t;
-    arc.setAttribute("stroke-dasharray", `${len} ${Math.max(1, GA.LEN - len)}`);
-    arc.setAttribute("stroke", GA.RED_FROM != null && v >= GA.RED_FROM ? "#FF6B6B" : "#1E88FF");
-  }
-
-  // cập nhật số RPM hiển thị
-  const txt = q("#rpmText");    if (txt) txt.textContent = Math.round(v);
-  const val = q("#rpmValue");   if (val) val.textContent = `${Math.round(v)} rpm`;
-}
 
 
       async function pollRPM() {
@@ -1206,6 +1105,30 @@ function setGauge(rpm) {
         }catch(e){}
       }
       q("#btnLockRefresh")?.addEventListener("click", lockState);
+      // Event handler cho checkbox lock_enabled - CHỈ gọi config API, KHÔNG gọi lock command
+      q("#lock_enabled")?.addEventListener("change", async (e) => {
+        // Khi thay đổi checkbox, CHỈ cập nhật config, KHÔNG gọi lock command
+          const body = {
+          lock_enabled: e.target.checked
+        };
+        try {
+          const result = await apiText("/api/set", {method:"POST", body: JSON.stringify(body)});
+          if (result && result.includes("ok")) {
+            // Hiển thị thông báo thành công
+            q("#msgLockCfg").textContent = e.target.checked ? "Lock enabled" : "Lock disabled";
+            q("#msgLockCfg").style.color = "#4CAF50";
+          } else {
+            throw new Error("Server error");
+          }
+        } catch (error) {
+          q("#msgLockCfg").textContent = "Error: " + error;
+          q("#msgLockCfg").style.color = "#f44336";
+          // Revert checkbox state
+          e.target.checked = !e.target.checked;
+        }
+        setTimeout(()=> q("#msgLockCfg").textContent="", 2000);
+      });
+
       q("#btnLockSaveCfg")?.addEventListener("click", async ()=>{
         const body = {
           lock_enabled: q("#lock_enabled").checked,
@@ -1219,25 +1142,8 @@ function setGauge(rpm) {
         q("#msgLockCfg").textContent = await apiText("/api/set", {method:"POST", body: JSON.stringify(body)});
         setTimeout(()=> q("#msgLockCfg").textContent="", 1200);
       });
-      q("#btnLockNow")?.addEventListener("click", async ()=>{
-        await apiText("/api/lock_cmd", {method:"POST", body: JSON.stringify({cmd:"lock"})});
-        lockState();
-      });
-      q("#btnUnlockPass")?.addEventListener("click", async ()=>{
-        const code = only01(q("#unlock_pass").value);
-        if (!code){ q("#msgLockPass").textContent="Pass 0/1"; setTimeout(()=> q("#msgLockPass").textContent="", 1200); return; }
-        const t = await apiText("/api/lock_cmd", {method:"POST", body: JSON.stringify({cmd:"unlock", pass: code})});
-        q("#msgLockPass").textContent = t || "OK";
-        lockState();
-        setTimeout(()=> q("#msgLockPass").textContent="", 1200);
-      });
-      q("#btnLockSet")?.addEventListener("click", async ()=>{
-        const np = only01(q("#new_pass").value);
-        if (!np){ q("#msgLockPass").textContent="New pass 0/1"; setTimeout(()=> q("#msgLockPass").textContent="", 1200); return; }
-        const t = await apiText("/api/set", {method:"POST", body: JSON.stringify({lock_code: np})});
-        q("#msgLockPass").textContent = t || "Set OK";
-        setTimeout(()=> q("#msgLockPass").textContent="", 1200);
-      });
+
+
       q("#btnLockChange")?.addEventListener("click", async ()=>{
         const op = only01(q("#old_pass").value);
         const np1 = only01(q("#new_pass").value);
@@ -1248,6 +1154,385 @@ function setGauge(rpm) {
         setTimeout(()=> q("#msgLockPass").textContent="", 1200);
       });
 
+      // ---------- OTA Event Handlers ----------
+      // OTA State
+      q("#btnOtaState")?.addEventListener("click", async () => {
+        try {
+          const state = await apiGet("/api/ota/state");
+          if (state) {
+            alert(`OTA State:\nApp: ${state.app_label}\nPending: ${state.pending_validate}\nVersion: ${state.version}\nBackups: ${state.backup_list}`);
+          }
+        } catch (error) {
+          console.error("OTA state error:", error);
+        }
+      });
+
+      // Create Backup
+      q("#btnCreateBackup")?.addEventListener("click", async () => {
+        try {
+          const result = await apiText("/api/ota/backup_fs", { method: "POST" });
+          if (result && result.includes("ok")) {
+            toast(true, "FS backup created successfully!");
+          } else {
+            toast(false, "Backup failed: " + result);
+          }
+        } catch (error) {
+          console.error("Backup error:", error);
+          toast(false, "Backup failed: " + error);
+        }
+      });
+
+      // Rollback FS
+      q("#btnRollbackFs")?.addEventListener("click", async () => {
+        if (confirm("Rollback filesystem? This will reboot the device.")) {
+          try {
+            const result = await apiText("/api/ota/rollback_fs", { method: "POST" });
+            if (result && result.includes("ok")) {
+              toast(true, "FS rollback initiated, rebooting...");
+            } else {
+              toast(false, "Rollback failed: " + result);
+            }
+          } catch (error) {
+            console.error("Rollback error:", error);
+            toast(false, "Rollback failed: " + error);
+          }
+        }
+      });
+
+      // Rollback Firmware
+      q("#btnRollbackFw")?.addEventListener("click", async () => {
+        if (confirm("Rollback firmware? This will reboot the device.")) {
+          try {
+            const result = await apiText("/api/ota/rollback_fw", { method: "POST" });
+            if (result && result.includes("ok")) {
+              toast(true, "Firmware rollback initiated, rebooting...");
+        } else {
+              toast(false, "Rollback failed: " + result);
+            }
+        } catch (error) {
+            console.error("Rollback error:", error);
+            toast(false, "Rollback failed: " + error);
+          }
+        }
+      });
+
+      // Upload Single File
+      q("#btnUploadFile")?.addEventListener("click", async () => {
+        const fileInput = q("#oneFile");
+        const pathInput = q("#upPath");
+        
+        if (!fileInput.files[0]) {
+          alert("Please select a file");
+          return;
+        }
+        
+        const file = fileInput.files[0];
+        const path = pathInput.value;
+        
+        if (!path) {
+          alert("Please enter a path");
+          return;
+        }
+        
+        // Show progress
+        const progressContainer = q("#oneFile").closest("div").nextElementSibling.nextElementSibling;
+        const progressFill = progressContainer.querySelector(".progress-fill");
+        const progressText = progressContainer.querySelector(".progress-text");
+        
+        progressContainer.style.display = "block";
+        progressFill.style.width = "0%";
+        progressText.textContent = "0% (0 KB / " + Math.round(file.size / 1024) + " KB) - 0 KB/s";
+        
+        // Hold AP
+        await apiText("/api/wifi_hold?on=1", { method: "POST" });
+        
+        // Create FormData
+        const formData = new FormData();
+        formData.append("file", file);
+        
+        // Upload with progress
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/upload?path=" + encodeURIComponent(path));
+        
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            const loadedKB = Math.round(e.loaded / 1024);
+            const totalKB = Math.round(e.total / 1024);
+            const speed = Math.round(e.loaded / (Date.now() - startTime) * 1000 / 1024);
+            
+            progressFill.style.width = percent + "%";
+            progressText.textContent = percent + "% (" + loadedKB + " KB / " + totalKB + " KB) - " + speed + " KB/s";
+          }
+        };
+        
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              if (response.ok) {
+                toast(true, "File uploaded successfully!");
+                progressContainer.style.display = "none";
+                // Refresh page to show changes
+                setTimeout(() => location.reload(), 1000);
+              } else {
+                toast(false, "Upload failed: " + (response.msg || "Unknown error"));
+                progressContainer.style.display = "none";
+              }
+            } catch (e) {
+              toast(false, "Upload failed: Invalid response");
+              progressContainer.style.display = "none";
+            }
+          } else {
+            toast(false, "Upload failed: " + xhr.responseText);
+            progressContainer.style.display = "none";
+          }
+          
+          // Release AP hold
+          apiText("/api/wifi_hold?on=0", { method: "POST" });
+        };
+        
+        xhr.onerror = () => {
+          toast(false, "Upload failed");
+          progressContainer.style.display = "none";
+          apiText("/api/wifi_hold?on=0", { method: "POST" });
+        };
+        
+        const startTime = Date.now();
+        xhr.send(formData);
+      });
+
+      // FS Image Upload Form
+      q("#otaFsForm")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        
+        const fileInput = e.target.querySelector('input[type="file"]');
+        if (!fileInput.files[0]) {
+          alert("Please select a filesystem image file");
+          return;
+        }
+        
+        const file = fileInput.files[0];
+        const progressContainer = e.target.nextElementSibling;
+        const progressFill = progressContainer.querySelector(".progress-fill");
+        const progressText = progressContainer.querySelector(".progress-text");
+        
+        // Show progress
+        progressContainer.style.display = "block";
+        progressFill.style.width = "0%";
+        progressText.textContent = "0% (0 KB / " + Math.round(file.size / 1024) + " KB) - 0 KB/s";
+        
+        // Hold AP
+        await apiText("/api/wifi_hold?on=1", { method: "POST" });
+        
+        // Upload with progress
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/ota/fsimage");
+        
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            const loadedKB = Math.round(e.loaded / 1024);
+            const totalKB = Math.round(e.total / 1024);
+            const speed = Math.round(e.loaded / (Date.now() - startTime) * 1000 / 1024);
+            
+            progressFill.style.width = percent + "%";
+            progressText.textContent = percent + "% (" + loadedKB + " KB / " + totalKB + " KB) - " + speed + " KB/s";
+          }
+        };
+        
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              if (response.ok) {
+                toast(true, "Filesystem image uploaded successfully! Rebooting...");
+                // Countdown and reload
+                let countdown = 5;
+                const countdownInterval = setInterval(() => {
+                  countdown--;
+                  if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                    location.reload();
+                  } else {
+                    toast(true, `Rebooting in ${countdown} seconds...`);
+                  }
+                }, 1000);
+              } else {
+                toast(false, "Upload failed: " + (response.msg || "Unknown error"));
+                progressContainer.style.display = "none";
+              }
+            } catch (e) {
+              toast(false, "Upload failed: Invalid response");
+              progressContainer.style.display = "none";
+            }
+          } else {
+            toast(false, "Upload failed");
+            progressContainer.style.display = "none";
+          }
+          
+          // Release AP hold
+          apiText("/api/wifi_hold?on=0", { method: "POST" });
+        };
+        
+        xhr.onerror = () => {
+          toast(false, "Upload failed");
+          progressContainer.style.display = "none";
+          apiText("/api/wifi_hold?on=0", { method: "POST" });
+        };
+        
+        const formData = new FormData();
+        formData.append("update", file);
+        const startTime = Date.now();
+        xhr.send(formData);
+      });
+
+      // Enhanced OTA Forms with Progress
+      q("#otaFwForm")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        
+        const fileInput = e.target.querySelector('input[type="file"]');
+        if (!fileInput.files[0]) {
+          alert("Please select a firmware file");
+          return;
+        }
+        
+        const file = fileInput.files[0];
+        const progressContainer = e.target.nextElementSibling;
+        const progressFill = progressContainer.querySelector(".progress-fill");
+        const progressText = progressContainer.querySelector(".progress-text");
+        
+        // Show progress
+        progressContainer.style.display = "block";
+        progressFill.style.width = "0%";
+        progressText.textContent = "0% (0 KB / " + Math.round(file.size / 1024) + " KB) - 0 KB/s";
+        
+        // Hold AP
+        await apiText("/api/wifi_hold?on=1", { method: "POST" });
+        
+        // Upload with progress
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/ota/firmware");
+        
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            const loadedKB = Math.round(e.loaded / 1024);
+            const totalKB = Math.round(e.total / 1024);
+            const speed = Math.round(e.loaded / (Date.now() - startTime) * 1000 / 1024);
+            
+            progressFill.style.width = percent + "%";
+            progressText.textContent = percent + "% (" + loadedKB + " KB / " + totalKB + " KB) - " + speed + " KB/s";
+          }
+        };
+        
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            const response = JSON.parse(xhr.responseText);
+            if (response.ok) {
+              toast(true, "Firmware uploaded successfully! Rebooting...");
+              // Countdown and reload
+              let countdown = 5;
+              const countdownInterval = setInterval(() => {
+                countdown--;
+                if (countdown <= 0) {
+                  clearInterval(countdownInterval);
+                  location.reload();
+          } else {
+                  toast(true, `Rebooting in ${countdown} seconds...`);
+                }
+              }, 1000);
+            } else {
+              toast(false, "Upload failed: " + response.msg);
+              progressContainer.style.display = "none";
+            }
+          } else {
+            toast(false, "Upload failed");
+            progressContainer.style.display = "none";
+          }
+          
+          // Release AP hold
+          apiText("/api/wifi_hold?on=0", { method: "POST" });
+        };
+        
+        xhr.onerror = () => {
+          toast(false, "Upload failed");
+          progressContainer.style.display = "none";
+          apiText("/api/wifi_hold?on=0", { method: "POST" });
+        };
+        
+        const formData = new FormData();
+        formData.append("update", file);
+        const startTime = Date.now();
+        xhr.send(formData);
+      });
+
+      // ---------- WiFi Functions ----------
+      // Refresh WiFi status
+      async function wifiRefreshStatus() {
+        try {
+          const data = await apiGet("/api/wifi/status");
+          if (data) {
+            q("#wifi_ssid")?.textContent = data.ssid || "Unknown";
+            q("#wifi_status")?.textContent = data.running ? "Running" : "Stopped";
+            q("#wifi_timeout")?.textContent = (data.timeout_s || 0) + "s";
+          }
+        } catch (error) {
+          console.error("Wi-Fi status error:", error);
+          q("#wifi_ssid")?.textContent = "Error";
+          q("#wifi_status")?.textContent = "Error";
+          q("#wifi_timeout")?.textContent = "Error";
+        }
+      }
+
+      // Load WiFi config vào form
+      function loadWifiConfig() {
+        try {
+          if (cfg.ap_ssid !== undefined) {
+            q("#wifi_ssid_input")?.value = cfg.ap_ssid || "";
+            q("#wifi_pass_input")?.value = ""; // Không hiển thị password
+            q("#wifi_timeout_input")?.value = cfg.ap_timeout_s || 120;
+          } else {
+            q("#wifi_ssid_input")?.value = "";
+            q("#wifi_pass_input")?.value = "";
+            q("#wifi_timeout_input")?.value = 120;
+          }
+        } catch (error) {
+          console.error("Load Wi-Fi config error:", error);
+          q("#wifi_ssid_input")?.value = "";
+          q("#wifi_pass_input")?.value = "";
+          q("#wifi_timeout_input")?.value = 120;
+        }
+      }
+
+      // WiFi event listeners
+      q("#btnWifiRefresh")?.addEventListener("click", wifiRefreshStatus);
+      q("#btnWifiOffTab")?.addEventListener("click", wifiOff);
+      q("#btnWifiSave")?.addEventListener("click", async () => {
+        try {
+          const pass = q("#wifi_pass_input")?.value || "";
+          const timeout = +(q("#wifi_timeout_input")?.value || "120");
+          
+          const response = await fetch("/api/wifi/config", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ap_pass: pass, ap_timeout_s: timeout })
+          });
+          
+          if (response.ok) {
+            toast(true, "Wi-Fi config updated");
+            q("#msgWifiConfig").textContent = "Config updated successfully!";
+            setTimeout(() => q("#msgWifiConfig").textContent = "", 3000);
+            wifiRefreshStatus();
+          } else {
+            toast(false, "Failed to update Wi-Fi config");
+          }
+        } catch (error) {
+          console.error("Wi-Fi save error:", error);
+          toast(false, "Error saving Wi-Fi config");
+        }
+      });
+
       // ---------- Init ----------
       (async () => {
         setTab("qs");
@@ -1255,18 +1540,39 @@ function setGauge(rpm) {
         await load();
         setInterval(loadLogs, 1000); // logs
         lockState();
-        loadWifiConfig(); // Load Wi-Fi config
         
-        // Cập nhật trạng thái Pass Mode
-        updatePassModeStatus();
+        // Load WiFi status
+        wifiRefreshStatus();
+        
+        // Mark firmware as valid after successful boot
+        setTimeout(async () => {
+          try {
+            await apiText("/api/ota/mark_valid", { method: "POST" });
+            console.log("Firmware marked as valid");
+          } catch (error) {
+            console.log("Could not mark firmware as valid:", error);
+          }
+        }, 5000);
+        
+        // Gauge config + polling
+        configureGauge({ start: GA.START, end: GA.END, max: 14000, redFrom: 12000 });
+        rpmSmooth = 0;
+        setGauge(0);                 // cho kim về 0 ngay (→ 240°)
+        setInterval(pollRPM, 200);   // rồi mới poll
+        
+        // Setup tab event handlers AFTER DOM is ready
+        console.log("Setting up tab handlers...");
+        console.log("tb.qs element:", tb.qs);
+        console.log("tabs.qs element:", tabs.qs);
+        
+        if (tb.qs) tb.qs.onclick = () => { console.log("QS clicked"); setTab("qs"); };
+        if (tb.bf) tb.bf.onclick = () => { console.log("BF clicked"); setTab("bf"); };
+        if (tb.tools) tb.tools.onclick = () => { console.log("Tools clicked"); setTab("tools"); };
+        if (tb.lock) tb.lock.onclick = () => { console.log("Lock clicked"); setTab("lock"); };
+        if (tb.wifi) tb.wifi.onclick = () => { console.log("WiFi clicked"); setTab("wifi"); };
+        
+        console.log("Tab handlers initialized");
       })();
-
-      // Gauge config + polling
-     // nếu bạn có phần cấu hình góc:
-configureGauge({ start: GA.START, end: GA.END, max: 14000, redFrom: 12000 });
-rpmSmooth = 0;
-setGauge(0);                 // cho kim về 0 ngay (→ 240°)
-setInterval(pollRPM, 200);   // rồi mới poll
 
 
     </script>

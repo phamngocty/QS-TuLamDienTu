@@ -26,24 +26,9 @@ struct QSConfig {
   uint16_t holdoff_ms = 180;        // Lockout after cut
   CutOutputSel cut_output = CutOutputSel::IGN; // default output
   // Backfire (relay-simple): OFF by default per user request
-    BackfireCfg backfire;
   bool backfire_enabled = false;
   uint16_t backfire_extra_ms = 15;  // Extra cut when backfire enabled
   uint16_t backfire_min_rpm = 4500; // Only above this rpm
-  
-  // ==== Backfire (mới) ====
-  uint8_t  bf_enable        = 0;     // 0/1
-  uint8_t  bf_ign_only      = 1;     // 0/1
-  uint8_t  bf_mode          = 3;     // 1=SHIFT,2=OVERRUN,3=both
-  uint16_t bf_rpm_min       = 4500;
-  uint16_t bf_rpm_max       = 9000;
-  uint16_t bf_warmup_s      = 120;
-  uint16_t bf_decel_thresh  = 3000;  // rpm/s
-  uint16_t bf_window_ms     = 250;
-  uint8_t  bf_burst_count   = 3;
-  uint16_t bf_burst_on      = 25;    // ms
-  uint16_t bf_burst_off     = 75;    // ms
-  uint16_t bf_refractory_ms = 1500;  // ms
   
   // Calibration
   float rpm_scale = 1.0f;           // rpm_display = rpm_raw * rpm_scale
@@ -74,6 +59,10 @@ struct QSConfig {
   // ==== Auto Cut Configuration ====
   uint16_t auto_cut_min    = 20;       // min cut time in auto mode
   uint16_t auto_cut_max    = 150;      // max cut time in auto mode
+
+  // ==== Lock Status (runtime) ====
+  bool vehicle_locked = false;          // Trạng thái khóa hiện tại
+  bool has_password = false;            // Đã đặt mật khẩu hay chưa
 
 };
 
