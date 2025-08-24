@@ -106,7 +106,7 @@ void CTRL::tick(){
       tEntry=millis();
     } break;
 
-    case State::RECOVER:
+    case State::RECOVER: {
       uint32_t elapsed = millis() - tEntry;
       if (elapsed >= CFG::get().holdoff_ms) { 
         st=State::IDLE; 
@@ -117,8 +117,6 @@ void CTRL::tick(){
         cutReason="holdoff";
       }
       break;
+    }
   }
- 
-
-
 }
