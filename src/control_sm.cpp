@@ -59,10 +59,12 @@ void CTRL::tick(){
   QSConfig cfg = CFG::get();
 
   // Update RPM helpers
-  RPM::setPPR(cfg.ppr); RPM::setScale(cfg.rpm_scale);
-  const uint16_t rpm = RPM::get();PWMTEST::tick();
-
-  // software tick for PWM test generator
+  RPM::setPPR(cfg.ppr); 
+  RPM::setScale(cfg.rpm_scale);
+  const uint16_t rpm = RPM::get();
+  
+  // Software tick for PWM test generator
+  PWMTEST::tick();
 
   switch(st){
     case State::IDLE:

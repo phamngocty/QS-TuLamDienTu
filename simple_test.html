@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Test</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        .btn { padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Simple Test Quickshifter</h1>
+    
+    <h3>📊 Test RPM</h3>
+    <button class="btn btn-primary" onclick="testRPM()">Test RPM (5000 RPM)</button>
+    <div id="rpmStatus" class="status">Click Test RPM</div>
+    
+    <h3>⚡ Test Cut</h3>
+    <button class="btn btn-danger" onclick="testCut('ign')">Test IGN Cut</button>
+    <button class="btn btn-danger" onclick="testCut('inj')">Test INJ Cut</button>
+    <div id="cutStatus" class="status">Click Test Cut</div>
+    
+    <h3>📊 Check Status</h3>
+    <button class="btn btn-success" onclick="checkStatus()">Check Status</button>
+    <div id="statusResult" class="status">Click Check Status</div>
+    
+    <script>
+        async function testRPM() {
+            try {
+                const response = await fetch('/api/testrpm?en=1&rpm=5000&ppr=1', {method: 'POST'});
+                if (response.ok) {
+                    document.getElementById('rpmStatus').textContent = '✅ RPM Test OK';
+                    document.getElementById('rpmStatus').style.background = '#d4edda';
+                } else {
+                    document.getElementById('rpmStatus').textContent = '❌ RPM Test Failed';
+                    document.getElementById('rpmStatus').style.background = '#f8d7da';
+                }
+            } catch (e) {
+                document.getElementById('rpmStatus').textContent = '❌ Error: ' + e.message;
+                document.getElementById('rpmStatus').style.background = '#f8d7da';
+            }
+        }
+        
+        async function testCut(output) {
+            try {
+                const response = await fetch(`/api/testcut?out=${output}`, {method: 'POST'});
+                if (response.ok) {
+                    document.getElementById('cutStatus').textContent = `✅ ${output.toUpperCase()} Cut OK`;
+                    document.getElementById('cutStatus').style.background = '#d4edda';
+                } else {
+                    document.getElementById('cutStatus').textContent = `❌ ${output.toUpperCase()} Cut Failed`;
+                    document.getElementById('cutStatus').style.background = '#f8d7da';
+                }
+            } catch (e) {
+                document.getElementById('cutStatus').textContent = '❌ Error: ' + e.message;
+                document.getElementById('cutStatus').style.background = '#f8d7da';
+            }
+        }
+        
+        async function checkStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                document.getElementById('statusResult').textContent = 
+                    `RPM: ${data.rpm}, State: ${data.state}, Can Cut: ${data.can_cut}`;
+                document.getElementById('statusResult').style.background = '#d1ecf1';
+            } catch (e) {
+                document.getElementById('statusResult').textContent = '❌ Error: ' + e.message;
+                document.getElementById('statusResult').style.background = '#f8d7da';
+            }
+        }
+    </script>
+</body>
+</html>

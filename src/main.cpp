@@ -75,6 +75,10 @@ void setup(){
 void loop(){
   // Ưu tiên xử lý khóa
   LOCK::tick();
+  
+  // Luôn gọi CUT::tick() để xử lý pulse timing
+  CUT::tick();
+  
   if (LOCK::isLocked()){
     WEB::loop(); // vẫn cho cấu hình khi đang khóa
     // heartbeat
@@ -100,14 +104,7 @@ void loop(){
   if (millis()-t0>500){ 
     t0=millis(); 
     digitalWrite(PIN_STATUS_LED, !digitalRead(PIN_STATUS_LED)); 
-
-     uint32_t now = millis();
-  // ... code khác
   }
-  CUT::tick();
-
-
-
 }
 // GỌI HÀM NÀY Ở CHỖ VỪA NHẢ QUICKSHIFT CUT
 // (ngay sau khi bạn tắt rơ-le QS)
